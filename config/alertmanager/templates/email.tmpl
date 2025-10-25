@@ -1,0 +1,171 @@
+{{ define "email.default.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #2c3e50; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
+        .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+        .alert { margin: 15px 0; padding: 15px; border-left: 4px solid #3498db; background: white; }
+        .alert.warning { border-left-color: #f39c12; }
+        .alert.critical { border-left-color: #e74c3c; }
+        .footer { background: #ecf0f1; padding: 15px; text-align: center; font-size: 12px; }
+        .label { display: inline-block; padding: 3px 8px; margin: 2px; background: #3498db; color: white; border-radius: 3px; font-size: 11px; }
+        h2 { margin: 0 0 10px 0; }
+        .summary { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+        .description { color: #666; }
+        .timestamp { color: #999; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 RTA CCTV Alert</h1>
+            <p>{{ .GroupLabels.alertname }}</p>
+        </div>
+        <div class="content">
+            <p><strong>Cluster:</strong> {{ .GroupLabels.cluster }}</p>
+            <p><strong>Service:</strong> {{ .GroupLabels.service }}</p>
+            <p><strong>Alerts Firing:</strong> {{ len .Alerts.Firing }}</p>
+
+            {{ range .Alerts }}
+            <div class="alert {{ .Labels.severity }}">
+                <div class="summary">{{ .Annotations.summary }}</div>
+                <div class="description">{{ .Annotations.description }}</div>
+                <div class="timestamp">Started: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}</div>
+                <div style="margin-top: 10px;">
+                    {{ range .Labels.SortedPairs }}
+                    <span class="label">{{ .Name }}: {{ .Value }}</span>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+        </div>
+        <div class="footer">
+            <p>RTA CCTV Video Management System - Monitoring & Alerting</p>
+            <p>View in Prometheus: <a href="http://prometheus:9090/alerts">Alert Dashboard</a></p>
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "email.critical.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #c0392b; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .critical-banner { background: #e74c3c; color: white; padding: 15px; text-align: center; font-size: 18px; font-weight: bold; }
+        .content { background: #fff5f5; padding: 20px; border: 2px solid #e74c3c; }
+        .alert { margin: 15px 0; padding: 15px; border-left: 4px solid #e74c3c; background: white; }
+        .action-required { background: #fffacd; padding: 15px; margin: 15px 0; border: 1px solid #f39c12; }
+        .footer { background: #ecf0f1; padding: 15px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="critical-banner">
+            ⚠️ CRITICAL ALERT - IMMEDIATE ACTION REQUIRED ⚠️
+        </div>
+        <div class="header">
+            <h1>{{ .GroupLabels.alertname }}</h1>
+        </div>
+        <div class="content">
+            <div class="action-required">
+                <strong>⚡ Action Required:</strong> This is a critical alert that requires immediate attention.
+            </div>
+
+            <p><strong>Cluster:</strong> {{ .GroupLabels.cluster }}</p>
+            <p><strong>Service:</strong> {{ .GroupLabels.service }}</p>
+            <p><strong>Critical Alerts:</strong> {{ len .Alerts.Firing }}</p>
+
+            {{ range .Alerts }}
+            <div class="alert">
+                <h3 style="margin-top: 0; color: #c0392b;">{{ .Annotations.summary }}</h3>
+                <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+                <p><strong>Started:</strong> {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}</p>
+                <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
+            </div>
+            {{ end }}
+        </div>
+        <div class="footer">
+            <p><strong>Escalation:</strong> If not resolved within 15 minutes, escalate to senior engineer on-call.</p>
+            <p>View details: <a href="http://prometheus:9090/alerts">Prometheus Alerts</a> | <a href="http://grafana:3001">Grafana Dashboard</a></p>
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "email.warning.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #f39c12; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
+        .content { background: #fffef5; padding: 20px; border: 1px solid #f39c12; }
+        .alert { margin: 15px 0; padding: 15px; border-left: 4px solid #f39c12; background: white; }
+        .footer { background: #ecf0f1; padding: 15px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Warning - {{ .GroupLabels.alertname }}</h1>
+        </div>
+        <div class="content">
+            <p>The following warnings have been detected and should be investigated:</p>
+
+            {{ range .Alerts }}
+            <div class="alert">
+                <h4 style="margin-top: 0;">{{ .Annotations.summary }}</h4>
+                <p>{{ .Annotations.description }}</p>
+                <p><small>Started: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}</small></p>
+            </div>
+            {{ end }}
+        </div>
+        <div class="footer">
+            <p>RTA CCTV Monitoring - Warning Alerts</p>
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "email.info.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #3498db; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
+        .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+        .alert { margin: 10px 0; padding: 10px; background: white; border-left: 3px solid #3498db; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>ℹ️ Daily Report - {{ .GroupLabels.alertname }}</h1>
+        </div>
+        <div class="content">
+            <p>Informational alerts summary:</p>
+            {{ range .Alerts }}
+            <div class="alert">
+                <p><strong>{{ .Annotations.summary }}</strong></p>
+                <p><small>{{ .Annotations.description }}</small></p>
+            </div>
+            {{ end }}
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}

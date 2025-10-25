@@ -1,0 +1,233 @@
+{
+  "dashboard": {
+    "title": "RTA CCTV System Overview",
+    "tags": ["rta", "cctv", "overview"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "title": "System Health Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "up{job=~\"go-api|vms-service|playback-service|livekit\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            },
+            "mappings": [
+              {"type": "value", "value": "0", "text": "DOWN"},
+              {"type": "value", "value": "1", "text": "UP"}
+            ]
+          }
+        }
+      },
+      {
+        "title": "Active Stream Reservations",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "targets": [
+          {
+            "expr": "stream_reservations_active",
+            "legendFormat": "{{source}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Count"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "API Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"go-api\"}[5m])",
+            "legendFormat": "{{method}} {{path}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Req/s"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "LiveKit Streaming Metrics",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "livekit_room_total",
+            "legendFormat": "Active Rooms"
+          },
+          {
+            "expr": "livekit_participant_total",
+            "legendFormat": "Participants"
+          }
+        ]
+      },
+      {
+        "title": "Playback Cache Hit Rate",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "rate(playback_cache_hits_total[5m]) / (rate(playback_cache_hits_total[5m]) + rate(playback_cache_misses_total[5m])) * 100"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 30, "color": "yellow"},
+                {"value": 70, "color": "green"}
+              ]
+            },
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "title": "Database Connection Pool",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 12},
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends",
+            "legendFormat": "Active Connections"
+          },
+          {
+            "expr": "pg_settings_max_connections",
+            "legendFormat": "Max Connections"
+          }
+        ]
+      },
+      {
+        "title": "MinIO Storage Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "targets": [
+          {
+            "expr": "minio_cluster_capacity_usable_total_bytes - minio_cluster_capacity_usable_free_bytes",
+            "legendFormat": "Used"
+          },
+          {
+            "expr": "minio_cluster_capacity_usable_total_bytes",
+            "legendFormat": "Total"
+          }
+        ],
+        "yaxes": [
+          {"format": "bytes", "label": "Storage"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "CPU Usage by Container",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{name=~\"cctv-.*\"}[5m]) * 100",
+            "legendFormat": "{{name}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "CPU %"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "Memory Usage by Container",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{name=~\"cctv-.*\"}",
+            "legendFormat": "{{name}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "bytes", "label": "Memory"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "Playback Transmux Performance",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(playback_transmux_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95 Duration"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(playback_transmux_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50 Duration"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "title": "Recent Alerts",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36},
+        "targets": [
+          {
+            "expr": "ALERTS{alertstate=\"firing\"}",
+            "format": "table"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "alertname": "Alert",
+                "severity": "Severity",
+                "service": "Service",
+                "instance": "Instance"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,314 @@
+# Production Docker Compose Configuration
+# Use: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.9'
+
+# Production-specific settings that override docker-compose.yml
+services:
+  # =========================================
+  # CACHE LAYER - Production Overrides
+  # =========================================
+  valkey:
+    restart: always
+    volumes:
+      - /mnt/data/valkey:/data  # External persistent storage
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # =========================================
+  # DATABASE - Production Overrides
+  # =========================================
+  postgres:
+    restart: always
+    volumes:
+      - /mnt/data/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+
+  # =========================================
+  # OBJECT STORAGE - Production Overrides
+  # =========================================
+  minio:
+    restart: always
+    command: server /data --console-address ":9001" --certs-dir /certs
+    volumes:
+      - /mnt/data/minio:/data
+      - ./certs/minio:/certs:ro
+    environment:
+      MINIO_ROOT_USER_FILE: /run/secrets/minio_root_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
+    secrets:
+      - minio_root_user
+      - minio_root_password
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+
+  # =========================================
+  # SERVICES - Production Overrides
+  # =========================================
+  vms-service:
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  stream-counter:
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+  storage-service:
+    restart: always
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      MINIO_SECRET_KEY_FILE: /run/secrets/storage_service_password
+    secrets:
+      - postgres_password
+      - storage_service_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+  recording-service:
+    restart: always
+    volumes:
+      - /mnt/data/recordings:/tmp/recordings
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+    deploy:
+      resources:
+        limits:
+          cpus: '16'
+          memory: 16G
+
+  metadata-service:
+    restart: always
+    environment:
+      DATABASE_URL_FILE: /run/secrets/metadata_db_url
+    secrets:
+      - metadata_db_url
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+  playback-service:
+    restart: always
+    volumes:
+      - /mnt/data/playback:/tmp/playback
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 4G
+
+  # =========================================
+  # LIVE STREAMING - Production Overrides
+  # =========================================
+  livekit:
+    restart: always
+    environment:
+      LIVEKIT_API_KEY_FILE: /run/secrets/livekit_api_key
+      LIVEKIT_API_SECRET_FILE: /run/secrets/livekit_api_secret
+    secrets:
+      - livekit_api_key
+      - livekit_api_secret
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 8G
+
+  livekit-ingress:
+    restart: always
+    environment:
+      LIVEKIT_API_KEY_FILE: /run/secrets/livekit_api_key
+      LIVEKIT_API_SECRET_FILE: /run/secrets/livekit_api_secret
+    secrets:
+      - livekit_api_key
+      - livekit_api_secret
+
+  go-api:
+    restart: always
+    environment:
+      LIVEKIT_API_KEY_FILE: /run/secrets/livekit_api_key
+      LIVEKIT_API_SECRET_FILE: /run/secrets/livekit_api_secret
+      VALKEY_PASSWORD_FILE: /run/secrets/valkey_password
+    secrets:
+      - livekit_api_key
+      - livekit_api_secret
+      - valkey_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+  # =========================================
+  # DASHBOARD - Production Overrides
+  # =========================================
+  dashboard:
+    restart: always
+    environment:
+      VITE_API_URL: https://api.rta-cctv.ae
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+  # =========================================
+  # MONITORING - Production Overrides
+  # =========================================
+  prometheus:
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=90d'  # 90 days in production
+      - '--storage.tsdb.retention.size=200GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - /mnt/data/prometheus:/prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+
+  grafana:
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
+      GF_DATABASE_PASSWORD_FILE: /run/secrets/grafana_db_password
+      GF_SERVER_ROOT_URL: https://monitoring.rta-cctv.ae
+      GF_SERVER_CERT_FILE: /certs/grafana.crt
+      GF_SERVER_CERT_KEY: /certs/grafana.key
+      GF_SERVER_PROTOCOL: https
+    secrets:
+      - grafana_admin_password
+      - grafana_db_password
+    volumes:
+      - /mnt/data/grafana:/var/lib/grafana
+      - ./certs/grafana:/certs:ro
+
+  loki:
+    restart: always
+    volumes:
+      - /mnt/data/loki:/loki
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+
+  alertmanager:
+    restart: always
+    environment:
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+    secrets:
+      - smtp_password
+    volumes:
+      - /mnt/data/alertmanager:/alertmanager
+
+# =========================================
+# SECRETS MANAGEMENT
+# =========================================
+secrets:
+  postgres_password:
+    external: true
+  minio_root_user:
+    external: true
+  minio_root_password:
+    external: true
+  storage_service_password:
+    external: true
+  metadata_db_url:
+    external: true
+  livekit_api_key:
+    external: true
+  livekit_api_secret:
+    external: true
+  valkey_password:
+    external: true
+  grafana_admin_password:
+    external: true
+  grafana_db_password:
+    external: true
+  smtp_password:
+    external: true
+
+# =========================================
+# PRODUCTION VOLUMES (External)
+# =========================================
+volumes:
+  valkey_data:
+    external: true
+    name: rta_cctv_valkey_data
+  postgres_data:
+    external: true
+    name: rta_cctv_postgres_data
+  minio_data:
+    external: true
+    name: rta_cctv_minio_data
+  prometheus_data:
+    external: true
+    name: rta_cctv_prometheus_data
+  grafana_data:
+    external: true
+    name: rta_cctv_grafana_data
+  loki_data:
+    external: true
+    name: rta_cctv_loki_data
+  alertmanager_data:
+    external: true
+    name: rta_cctv_alertmanager_data
+
+# =========================================
+# PRODUCTION NETWORKS
+# =========================================
+networks:
+  cctv-network:
+    external: true
+    name: rta_cctv_network

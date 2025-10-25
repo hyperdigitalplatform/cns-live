@@ -1,0 +1,588 @@
+# ============================================
+# RTA CCTV System - Root .gitignore
+# Excludes binaries, dependencies, and downloadable plugins
+# ============================================
+
+# ===================
+# Environment & Secrets
+# ===================
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+certs/*.key
+certs/*.pem
+
+# ===================
+# IDE & Editors
+# ===================
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.vspscc
+*.vssscc
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs (IntelliJ, GoLand, WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw?
+
+# ===================
+# Operating System
+# ===================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+**/*:Zone.Identifier
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ===================
+# Docker
+# ===================
+# Don't ignore docker-compose files, but ignore override
+# docker-compose.override.yml
+
+# Docker volumes data (persistent storage)
+volumes/
+data/
+postgres_data/
+valkey_data/
+minio_data/
+grafana_data/
+prometheus_data/
+loki_data/
+
+# ===================
+# Go (Backend Services)
+# ===================
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Dependency directories
+vendor/
+go.sum.backup
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Build directories
+dist/
+build/
+tmp/
+
+# Air live reload
+tmp/
+
+# ===================
+# Node.js / JavaScript / TypeScript (Dashboard)
+# ===================
+# Dependencies
+node_modules/
+jspm_packages/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+
+# Package manager files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+
+# TypeScript
+*.tsbuildinfo
+
+# Production
+/build
+
+# Misc
+.DS_Store
+*.pem
+
+# ===================
+# Python (Object Detection / Scripts)
+# ===================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.ENV/
+.python-version
+
+# Distribution / packaging
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.manifest
+*.spec
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# ML Models (downloadable)
+*.h5
+*.pkl
+*.pth
+*.onnx
+*.pb
+*.tflite
+*.caffemodel
+*.weights
+models/
+checkpoints/
+
+# ===================
+# Rust (GStreamer plugins)
+# ===================
+# Compiled files
+*.rlib
+*.rmeta
+*.crate
+
+# Cargo
+target/
+Cargo.lock
+**/*.rs.bk
+
+# ===================
+# C/C++ (Native dependencies)
+# ===================
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# ===================
+# Video / Media Files
+# ===================
+# Recordings (temporary/test)
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.flv
+*.wmv
+*.m4v
+*.ts
+*.m3u8
+
+# Images (test/temp)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.ico
+
+# Audio
+*.mp3
+*.wav
+*.flac
+*.aac
+
+# Exclude test media from git
+recordings/
+clips/
+segments/
+cache/
+playback_cache/
+recording_temp/
+
+# ===================
+# Database Files
+# ===================
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# PostgreSQL dumps
+*.dump
+*.sql.gz
+
+# Database migration temp files
+migrations/*.tmp
+
+# ===================
+# Logs
+# ===================
+# All log files
+*.log
+logs/
+log/
+*.log.*
+*.log.*.gz
+
+# Application specific logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===================
+# Temporary Files
+# ===================
+# General temp
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# ===================
+# Downloadable Dependencies & Plugins
+# ===================
+
+# GStreamer plugins (compiled from source)
+services/whip-pusher/gst-plugins-rs/
+*.so
+*.dll
+*.dylib
+lib/gstreamer-1.0/
+usr/lib/x86_64-linux-gnu/gstreamer-1.0/
+
+# Rust toolchain (installed via rustup)
+.cargo/
+.rustup/
+
+# Go modules cache
+go/pkg/mod/
+
+# Node modules (downloaded via npm/yarn)
+node_modules/
+.pnp/
+.pnp.js
+
+# Python packages (downloaded via pip)
+site-packages/
+.Python
+lib/
+lib64/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Milestone SDK (downloaded separately)
+mipsdk/
+MilestoneSdk/
+VideoOS.Platform.SDK/
+
+# YOLO models (downloadable)
+yolov8n.onnx
+yolov8s.onnx
+yolov8m.onnx
+yolov8l.onnx
+yolov8x.onnx
+*.pt
+*.weights
+
+# ONNX Runtime (downloadable)
+onnxruntime/
+onnxruntime-*/
+
+# FFmpeg binaries (pre-built)
+ffmpeg
+ffmpeg.exe
+ffprobe
+ffprobe.exe
+ffplay
+ffplay.exe
+
+# MediaMTX binary (downloaded)
+mediamtx
+mediamtx.exe
+
+# LiveKit binaries
+livekit-server
+livekit-server.exe
+livekit-cli
+livekit-cli.exe
+
+# Kong plugins (Lua)
+kong/plugins/*/vendor/
+
+# Coturn (TURN server)
+coturn/
+turnserver
+turnserver.exe
+
+# ===================
+# Build Artifacts
+# ===================
+# Docker build cache
+.dockerignore.backup
+
+# Compiled binaries
+*.wasm
+
+# Archive files
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.bz2
+
+# ===================
+# CI/CD
+# ===================
+.github/workflows/*.log
+
+# ===================
+# Testing
+# ===================
+# Test coverage
+coverage/
+.nyc_output/
+test-results/
+*.lcov
+
+# E2E test artifacts
+playwright-report/
+test-results/
+screenshots/
+
+# ===================
+# Monitoring & Observability
+# ===================
+# Prometheus data
+prometheus/data/
+
+# Grafana data
+grafana/data/
+
+# Loki data
+loki/data/
+
+# ===================
+# Certificates (SSL/TLS)
+# ===================
+# Keep example/template certs, exclude real ones
+*.crt
+*.cert
+*.ca-bundle
+!certs/README.md
+!certs/*.example.*
+
+# ===================
+# Documentation Build Artifacts
+# ===================
+# Sphinx
+_build/
+_static/
+_templates/
+
+# MkDocs
+site/
+
+# ===================
+# Project Specific
+# ===================
+# Valkey/Redis RDB files
+dump.rdb
+appendonly.aof
+
+# MinIO data
+minio/data/
+
+# PostgreSQL data directory
+postgresql/data/
+
+# Kong declarative config cache
+kong/.kong_env
+kong/.kong_cache
+
+# Temporary recording segments
+/tmp/recordings/
+
+# LiveKit data
+livekit/data/
+
+# WHIP pusher containers runtime data
+whip-pusher-*/
+
+# ===================
+# Keep Important Files
+# ===================
+# Force include important configs (override above rules)
+!docker-compose.yml
+!docker-compose.prod.yml
+!Dockerfile
+!**/Dockerfile
+!.env.example
+!README.md
+!**/README.md
+!LICENSE
+!.gitignore
+!**/.gitignore
+!Makefile
+!**/Makefile
+
+# Keep documentation
+!*.md
+!docs/**
+!VERIFICATION_GUIDE.md
+!WHIP_IMPLEMENTATION.md
+!RTA-CCTV-Requirements-CORRECTED.md
+!MILESTONE_INTEGRATION_REQUIREMENTS.md
+
+# Keep configuration templates
+!config/*.example.*
+!config/*.template.*
+!*.example
+!*.template
+
+# Keep shell scripts
+!*.sh
+!**/*.sh
+
+# Keep source code
+!**/*.go
+!**/*.js
+!**/*.ts
+!**/*.tsx
+!**/*.jsx
+!**/*.py
+!**/*.rs
+!**/*.c
+!**/*.cpp
+!**/*.h
+!**/*.hpp
+!**/*.lua
+
+# Keep configuration files
+!**/*.yaml
+!**/*.yml
+!**/*.json
+!**/*.toml
+!**/*.ini
+!**/*.conf
+!**/go.mod
+
+# ===================
+# End of .gitignore
+# ===================

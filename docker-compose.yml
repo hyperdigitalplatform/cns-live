@@ -1,0 +1,1004 @@
+version: '3.9'
+
+networks:
+  cctv-network:
+    driver: bridge
+
+volumes:
+  valkey_data:
+  postgres_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  alertmanager_data:
+  playback_data:
+
+services:
+  # =========================================
+  # CACHE LAYER
+  # =========================================
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    container_name: cctv-valkey
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "6379:6379"
+    command: >
+      valkey-server
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # =========================================
+  # DATABASE
+  # =========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: cctv-postgres
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: cctv
+      POSTGRES_USER: cctv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres}
+      POSTGRES_MAX_CONNECTIONS: 100
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cctv"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # =========================================
+  # VMS SERVICE
+  # =========================================
+  vms-service:
+    build:
+      context: ./services/vms-service
+      dockerfile: Dockerfile
+    container_name: cctv-vms-service
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8081:8081"
+    environment:
+      # Database Configuration
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: cctv
+      POSTGRES_USER: cctv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres}
+
+      # Milestone VMS Configuration (deprecated - using PostgreSQL now)
+      MILESTONE_SERVER: ${MILESTONE_SERVER:-milestone:554}
+      MILESTONE_USER: ${MILESTONE_USER:-admin}
+      MILESTONE_PASS: ${MILESTONE_PASS:-password}
+      MILESTONE_AUTH_TYPE: WindowsDefault
+
+      # Service Configuration
+      PORT: 8081
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+
+      # Cache Configuration
+      CACHE_TTL: 5m
+      CACHE_CLEANUP: 10m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # =========================================
+  # STREAM COUNTER SERVICE
+  # =========================================
+  stream-counter:
+    build:
+      context: ./services/stream-counter
+      dockerfile: Dockerfile
+    container_name: cctv-stream-counter
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8087:8087"
+    environment:
+      # Valkey Configuration
+      VALKEY_ADDR: valkey:6379
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:-}
+      VALKEY_DB: 0
+      VALKEY_POOL_SIZE: 50
+
+      # Stream Limits
+      LIMIT_DUBAI_POLICE: ${LIMIT_DUBAI_POLICE:-50}
+      LIMIT_METRO: ${LIMIT_METRO:-30}
+      LIMIT_BUS: ${LIMIT_BUS:-20}
+      LIMIT_OTHER: ${LIMIT_OTHER:-400}
+      LIMIT_TOTAL: ${LIMIT_TOTAL:-500}
+
+      # Service Configuration
+      PORT: 8087
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    depends_on:
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # =========================================
+  # RTSP STREAMING SERVER
+  # =========================================
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: cctv-mediamtx
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8554:8554"   # RTSP server
+      - "8888:8888"   # HLS server
+      - "8889:8889"   # WebRTC server
+      - "9997:9997"   # API server
+      - "9998:9998"   # Metrics (Prometheus)
+    volumes:
+      - ./config/mediamtx.yml:/mediamtx.yml:ro
+    environment:
+      MTX_LOGDESTINATIONS: stdout
+      MTX_LOGLEVEL: ${LOG_LEVEL:-info}
+    # healthcheck disabled - wget not available in image
+    # mediamtx is running fine, just can't health check it
+    healthcheck:
+      disable: true
+    deploy:
+      resources:
+        limits:
+          cpus: '10'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 1G
+
+  # =========================================
+  # OBJECT STORAGE
+  # =========================================
+  minio:
+    image: minio/minio:latest
+    container_name: cctv-minio
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console UI
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme_minio}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # MinIO bucket initialization (runs once)
+  minio-init:
+    build:
+      context: ./config/minio
+      dockerfile: Dockerfile
+    container_name: cctv-minio-init
+    networks:
+      - cctv-network
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme_minio}
+      RECORDING_SERVICE_PASSWORD: ${RECORDING_SERVICE_PASSWORD:-changeme_recording}
+      STORAGE_SERVICE_PASSWORD: ${STORAGE_SERVICE_PASSWORD:-changeme_storage}
+      PLAYBACK_SERVICE_PASSWORD: ${PLAYBACK_SERVICE_PASSWORD:-changeme_playback}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  # =========================================
+  # STORAGE SERVICE
+  # =========================================
+  storage-service:
+    build:
+      context: ./services/storage-service
+      dockerfile: Dockerfile
+    container_name: cctv-storage-service
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8082:8082"
+    environment:
+      # Database Configuration
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: cctv
+      POSTGRES_USER: cctv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres}
+
+      # MinIO Configuration
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: storage-service
+      MINIO_SECRET_KEY: ${STORAGE_SERVICE_PASSWORD:-changeme_storage}
+      MINIO_USE_SSL: false
+      MINIO_BUCKET_RECORDINGS: cctv-recordings
+
+      # Service Configuration
+      PORT: 8082
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # =========================================
+  # RECORDING SERVICE
+  # =========================================
+  recording-service:
+    build:
+      context: ./services/recording-service
+      dockerfile: Dockerfile
+    container_name: cctv-recording-service
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8083:8083"
+    volumes:
+      - /tmp/recordings:/tmp/recordings
+    environment:
+      # Service URLs
+      STORAGE_SERVICE_URL: http://storage-service:8082
+      VMS_SERVICE_URL: http://vms-service:8081
+      STREAM_COUNTER_URL: http://stream-counter:8087
+
+      # Configuration
+      OUTPUT_DIR: /tmp/recordings
+      PORT: 8083
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    depends_on:
+      storage-service:
+        condition: service_healthy
+      vms-service:
+        condition: service_healthy
+      stream-counter:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '10'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  # =========================================
+  # METADATA SERVICE
+  # =========================================
+  metadata-service:
+    build:
+      context: ./services/metadata-service
+      dockerfile: Dockerfile
+    container_name: cctv-metadata-service
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8084:8084"
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://cctv:${POSTGRES_PASSWORD:-changeme_postgres}@postgres:5432/cctv?sslmode=disable
+
+      # Service Configuration
+      PORT: 8084
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # =========================================
+  # PLAYBACK SERVICE
+  # =========================================
+  playback-service:
+    build:
+      context: ./services/playback-service
+      dockerfile: Dockerfile
+    container_name: cctv-playback-service
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8092:8090"
+    volumes:
+      - playback_data:/tmp/playback
+    environment:
+      # MinIO Configuration
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: playback-service
+      MINIO_SECRET_KEY: ${PLAYBACK_SERVICE_PASSWORD:-changeme_playback}
+      MINIO_BUCKET: cctv-recordings
+      MINIO_USE_SSL: false
+
+      # Milestone VMS (optional - for external recordings)
+      MILESTONE_URL: ${MILESTONE_URL:-}
+      MILESTONE_USERNAME: ${MILESTONE_USERNAME:-}
+      MILESTONE_PASSWORD: ${MILESTONE_PASSWORD:-}
+
+      # Configuration
+      WORK_DIR: /tmp/playback
+      CACHE_DIR: /tmp/playback/cache
+      HLS_BASE_URL: http://localhost:8092/hls
+      PORT: 8090
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 512M
+
+  # Nginx for HLS/DASH delivery
+  nginx-playback:
+    image: nginx:alpine
+    container_name: cctv-nginx-playback
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8091:80"
+    volumes:
+      - ./config/nginx-playback.conf:/etc/nginx/conf.d/default.conf:ro
+      - /tmp/playback:/tmp/playback
+    depends_on:
+      - playback-service
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # =========================================
+  # LIVE STREAMING LAYER
+  # =========================================
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: cctv-livekit
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "7880:7880"   # HTTP
+      - "7881:7881"   # TCP for WebRTC
+      - "7882:7882"   # Prometheus metrics
+      - "40000-40100:40000-40100/udp"  # WebRTC UDP ports (moved to non-reserved range)
+    command: --config /etc/livekit.yaml
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:-}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-devsecret}
+      LIVEKIT_WEBHOOK_KEY: ${LIVEKIT_WEBHOOK_KEY:-webhookkey}
+      GO_API_URL: http://go-api:8086
+      TURN_DOMAIN: ${TURN_DOMAIN:-turn.rta.ae}
+    volumes:
+      - ./config/livekit.yaml:/etc/livekit.yaml:ro
+    depends_on:
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7880"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  livekit-ingress:
+    image: livekit/ingress:latest
+    container_name: cctv-livekit-ingress
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "7900:8080"   # WHIP server (WebRTC ingestion)
+      - "7901:8082"   # Health check
+      - "7902:8083"   # Prometheus metrics
+    environment:
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-devsecret}
+      INGRESS_CONFIG_FILE: /etc/ingress.yaml
+    volumes:
+      - ./config/livekit-ingress.yaml:/etc/ingress.yaml:ro
+    depends_on:
+      livekit:
+        condition: service_healthy
+      mediamtx:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  coturn:
+    image: coturn/coturn:4.6-alpine
+    container_name: cctv-coturn
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      EXTERNAL_IP: ${EXTERNAL_IP:-127.0.0.1}
+      TURN_USER: ${TURN_USER:-turnuser}
+      TURN_PASSWORD: ${TURN_PASSWORD:-turnpassword}
+      TURN_SECRET: ${TURN_SECRET:-turnsecret}
+    volumes:
+      - ./config/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./certs:/etc/coturn/certs:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # =========================================
+  # CENTRAL API SERVICE
+  # =========================================
+  go-api:
+    build:
+      context: ./services/go-api
+      dockerfile: Dockerfile
+    container_name: cctv-go-api
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8088:8086"   # HTTP API
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker API access for spawning WHIP pushers
+    environment:
+      # Service URLs
+      STREAM_COUNTER_URL: http://stream-counter:8087
+      VMS_SERVICE_URL: http://vms-service:8081
+      MEDIAMTX_URL: http://mediamtx:9997
+      LIVEKIT_URL: http://livekit:7880        # Internal API URL
+      LIVEKIT_WS_URL: ws://localhost:7880     # External WebSocket URL for browsers
+
+      # LiveKit credentials
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-devsecret}
+
+      # Valkey configuration
+      VALKEY_ADDR: valkey:6379
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:-}
+      VALKEY_DB: 0
+
+      # Service configuration
+      PORT: 8086
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    depends_on:
+      valkey:
+        condition: service_healthy
+      vms-service:
+        condition: service_healthy
+      stream-counter:
+        condition: service_healthy
+      livekit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # =========================================
+  # API GATEWAY
+  # =========================================
+  kong:
+    build:
+      context: ./config/kong
+      dockerfile: Dockerfile
+    container_name: cctv-kong
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8000:8000"   # Proxy HTTP
+      - "8443:8443"   # Proxy HTTPS
+      - "8001:8001"   # Admin API HTTP
+      - "8444:8444"   # Admin API HTTPS
+      - "8100:8100"   # Status API
+    volumes:
+      # Mount kong.yml as volume so changes take effect on restart without rebuild
+      - ./config/kong/kong.yml:/etc/kong/kong.yml:ro
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_LOG_LEVEL: ${LOG_LEVEL:-info}
+      KONG_PLUGINS: bundled
+      KONG_LUA_PACKAGE_PATH: /etc/kong/plugins/?.lua;;
+    depends_on:
+      vms-service:
+        condition: service_healthy
+      stream-counter:
+        condition: service_healthy
+      mediamtx:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # =========================================
+  # DASHBOARD
+  # =========================================
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: cctv-dashboard
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "3000:80"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - kong
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # =========================================
+  # MONITORING STACK
+  # =========================================
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: cctv-prometheus
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=50GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # Alertmanager - Alert Routing
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: cctv-alertmanager
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./config/alertmanager/templates:/etc/alertmanager/templates:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.advertise-address=0.0.0.0:9093'
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Loki - Log Aggregation
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: cctv-loki
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Promtail - Log Shipper
+  promtail:
+    image: grafana/promtail:2.9.3
+    container_name: cctv-promtail
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    volumes:
+      - ./config/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      loki:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Grafana - Visualization & Dashboards
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: cctv-grafana
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin_changeme}
+      GF_INSTALL_PLUGINS: ${GF_INSTALL_PLUGINS:-grafana-piechart-panel,grafana-clock-panel}
+      GF_DATABASE_TYPE: postgres
+      GF_DATABASE_HOST: postgres:5432
+      GF_DATABASE_NAME: grafana
+      GF_DATABASE_USER: grafana
+      GF_DATABASE_PASSWORD: ${GRAFANA_DB_PASSWORD:-grafana_password}
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # Node Exporter - System Metrics
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: cctv-node-exporter
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /:/host:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # cAdvisor - Container Metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: cctv-cadvisor
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # PostgreSQL Exporter - Database Metrics
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: cctv-postgres-exporter
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://cctv:${POSTGRES_PASSWORD:-changeme_postgres}@postgres:5432/cctv?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres_exporter/queries.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # Valkey (Redis) Exporter - Cache Metrics
+  valkey-exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    container_name: cctv-valkey-exporter
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "9121:9121"
+    environment:
+      REDIS_ADDR: "valkey:6379"
+      REDIS_PASSWORD: "${VALKEY_PASSWORD:-}"
+    depends_on:
+      valkey:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M

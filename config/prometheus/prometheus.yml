@@ -1,0 +1,147 @@
+# Prometheus Configuration for RTA CCTV System
+# Scrapes metrics from all microservices
+
+global:
+  scrape_interval: 15s # Scrape targets every 15 seconds
+  evaluation_interval: 15s # Evaluate rules every 15 seconds
+  external_labels:
+    cluster: 'rta-cctv-prod'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load alerting rules
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Go API Service (main orchestrator)
+  - job_name: 'go-api'
+    static_configs:
+      - targets: ['go-api:8088']
+        labels:
+          service: 'go-api'
+          tier: 'api'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # VMS Service (camera management)
+  - job_name: 'vms-service'
+    static_configs:
+      - targets: ['vms-service:8081']
+        labels:
+          service: 'vms-service'
+          tier: 'core'
+    metrics_path: '/metrics'
+
+  # Storage Service (MinIO abstraction)
+  - job_name: 'storage-service'
+    static_configs:
+      - targets: ['storage-service:8082']
+        labels:
+          service: 'storage-service'
+          tier: 'storage'
+    metrics_path: '/metrics'
+
+  # Recording Service
+  - job_name: 'recording-service'
+    static_configs:
+      - targets: ['recording-service:8083']
+        labels:
+          service: 'recording-service'
+          tier: 'recording'
+    metrics_path: '/metrics'
+
+  # Metadata Service
+  - job_name: 'metadata-service'
+    static_configs:
+      - targets: ['metadata-service:8084']
+        labels:
+          service: 'metadata-service'
+          tier: 'metadata'
+    metrics_path: '/metrics'
+
+  # Stream Counter Service
+  - job_name: 'stream-counter'
+    static_configs:
+      - targets: ['stream-counter:8087']
+        labels:
+          service: 'stream-counter'
+          tier: 'quota'
+    metrics_path: '/metrics'
+
+  # Playback Service
+  - job_name: 'playback-service'
+    static_configs:
+      - targets: ['playback-service:8090']
+        labels:
+          service: 'playback-service'
+          tier: 'playback'
+    metrics_path: '/metrics'
+    scrape_interval: 10s # More frequent for playback metrics
+
+  # LiveKit SFU
+  - job_name: 'livekit'
+    static_configs:
+      - targets: ['livekit:7882']
+        labels:
+          service: 'livekit'
+          tier: 'streaming'
+    metrics_path: '/metrics'
+    scrape_interval: 10s # More frequent for streaming metrics
+
+  # PostgreSQL Exporter
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgresql'
+          tier: 'database'
+
+  # Valkey (Redis) Exporter
+  - job_name: 'valkey'
+    static_configs:
+      - targets: ['valkey-exporter:9121']
+        labels:
+          service: 'valkey'
+          tier: 'cache'
+
+  # MinIO Metrics
+  - job_name: 'minio'
+    metrics_path: /minio/v2/metrics/cluster
+    scheme: http
+    static_configs:
+      - targets: ['minio:9000']
+        labels:
+          service: 'minio'
+          tier: 'storage'
+
+  # Node Exporter (system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+          tier: 'infrastructure'
+
+  # cAdvisor (container metrics)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+          tier: 'infrastructure'
+    scrape_interval: 30s # Less frequent, more resource intensive

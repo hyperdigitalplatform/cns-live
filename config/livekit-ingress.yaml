@@ -1,0 +1,75 @@
+# LiveKit Ingress Configuration
+# RTSP to LiveKit Bridge for RTA CCTV System
+
+# Logging level
+log_level: warn
+
+# CPU usage (0 = auto-detect)
+cpu_cost:
+  room_composite_cpu_cost: 3.0
+  track_composite_cpu_cost: 2.0
+  track_cpu_cost: 1.0
+
+# API connection to LiveKit server
+api_key: devkey
+api_secret: devsecret
+ws_url: ws://livekit:7880
+
+# Redis for state coordination
+redis:
+  address: valkey:6379
+  db: 3
+
+# Health check
+health_port: 8082
+
+# Prometheus metrics
+prometheus_port: 8083
+
+# WHIP server port (for WebRTC HTTP Ingestion Protocol)
+whip_port: 8080
+
+# RTSP ingestion settings
+rtsp:
+  # Transport protocol (tcp is more reliable)
+  transport: tcp
+
+  # Connection timeout
+  timeout: 5s
+
+  # Reconnection settings
+  retry_timeout: 30s
+
+  # Buffer size
+  buffer_size: 512KB
+
+# Video encoding settings
+video:
+  # Use H.264 (as per requirements)
+  codec: h264
+
+  # Pass-through mode (NO transcoding)
+  preset: copy
+
+  # If transcoding is needed (fallback)
+  width: 1920
+  height: 1080
+  framerate: 25
+  bitrate: 3000  # kbps
+
+# Audio settings (disabled for most cameras)
+audio:
+  enabled: false
+  codec: opus
+  bitrate: 64  # kbps
+
+# Room configuration
+room:
+  # Room name template: camera_{camera_id}
+  name_template: "camera_{stream_key}"
+
+  # Automatically create rooms
+  auto_create: true
+
+  # Maximum participants per room
+  max_participants: 100

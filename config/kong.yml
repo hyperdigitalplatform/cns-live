@@ -1,0 +1,356 @@
+# Kong Declarative Configuration for RTA CCTV System
+# Format: kong.yml (declarative format)
+# Version: 3.x
+
+_format_version: "3.0"
+_transform: true
+
+###############################################
+# SERVICES
+###############################################
+
+services:
+  # VMS Service - Milestone Integration
+  - name: vms-service
+    url: http://vms-service:8081
+    protocol: http
+    connect_timeout: 10000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - rta-cctv
+      - vms
+
+    routes:
+      - name: vms-cameras
+        paths:
+          - /api/v1/vms/cameras
+        methods:
+          - GET
+        strip_path: false
+        preserve_host: false
+        tags:
+          - cameras
+
+      - name: vms-camera-detail
+        paths:
+          - /api/v1/vms/cameras/~
+        methods:
+          - GET
+        strip_path: false
+        tags:
+          - cameras
+
+      - name: vms-stream-url
+        paths:
+          - /api/v1/vms/cameras/~/stream
+        methods:
+          - GET
+        strip_path: false
+        tags:
+          - streaming
+
+      - name: vms-ptz-control
+        paths:
+          - /api/v1/vms/cameras/~/ptz
+        methods:
+          - POST
+        strip_path: false
+        tags:
+          - ptz
+
+      - name: vms-recordings
+        paths:
+          - /api/v1/vms/recordings
+        methods:
+          - GET
+          - POST
+        strip_path: false
+        tags:
+          - recordings
+
+  # Stream Counter Service - Quota Management
+  - name: stream-counter-service
+    url: http://stream-counter:8087
+    protocol: http
+    connect_timeout: 5000
+    write_timeout: 10000
+    read_timeout: 10000
+    retries: 3
+    tags:
+      - rta-cctv
+      - quota
+
+    routes:
+      - name: stream-reserve
+        paths:
+          - /api/v1/stream/reserve
+        methods:
+          - POST
+        strip_path: false
+        tags:
+          - quota
+
+      - name: stream-release
+        paths:
+          - /api/v1/stream/release/~
+        methods:
+          - DELETE
+        strip_path: false
+        tags:
+          - quota
+
+      - name: stream-heartbeat
+        paths:
+          - /api/v1/stream/heartbeat/~
+        methods:
+          - POST
+        strip_path: false
+        tags:
+          - quota
+
+      - name: stream-stats
+        paths:
+          - /api/v1/stream/stats
+        methods:
+          - GET
+        strip_path: false
+        tags:
+          - monitoring
+
+  # MediaMTX API - Stream Management
+  - name: mediamtx-api
+    url: http://mediamtx:9997
+    protocol: http
+    connect_timeout: 5000
+    write_timeout: 10000
+    read_timeout: 10000
+    retries: 3
+    tags:
+      - rta-cctv
+      - streaming
+
+    routes:
+      - name: mediamtx-paths
+        paths:
+          - /api/v1/rtsp/paths
+        methods:
+          - GET
+        strip_path: true
+        request_buffering: false
+        response_buffering: false
+        tags:
+          - admin
+        # Rewrite to MediaMTX API
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v3/paths/list
+
+      - name: mediamtx-path-detail
+        paths:
+          - /api/v1/rtsp/paths/~
+        methods:
+          - GET
+          - POST
+          - DELETE
+        strip_path: true
+        tags:
+          - admin
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /v3/paths/$(uri_captures[1])
+
+###############################################
+# GLOBAL PLUGINS
+###############################################
+
+plugins:
+  # Request ID for tracing
+  - name: correlation-id
+    enabled: true
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+      echo_downstream: true
+
+  # CORS for RTA domains
+  - name: cors
+    enabled: true
+    config:
+      origins:
+        - https://rta.ae
+        - https://*.rta.ae
+        - http://localhost:3000  # Development only
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-Type
+        - Date
+        - X-Auth-Token
+        - X-Request-ID
+        - Authorization
+      exposed_headers:
+        - X-Request-ID
+        - X-RateLimit-Limit
+        - X-RateLimit-Remaining
+      credentials: true
+      max_age: 3600
+      preflight_continue: false
+
+  # Request size limiting
+  - name: request-size-limiting
+    enabled: true
+    config:
+      allowed_payload_size: 10  # 10MB max
+      size_unit: megabytes
+      require_content_length: false
+
+  # Response compression
+  - name: response-transformer
+    enabled: true
+    config:
+      add:
+        headers:
+          - "X-Powered-By: RTA CCTV System"
+          - "X-Kong-Upstream-Status: $(upstream_status)"
+
+  # Prometheus metrics
+  - name: prometheus
+    enabled: true
+    config:
+      per_consumer: true
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+      upstream_health_metrics: true
+
+###############################################
+# ROUTE-SPECIFIC PLUGINS
+###############################################
+
+# Rate limiting for stream reservation
+# This is handled by Stream Counter Service, but Kong provides additional layer
+# Example configuration (to be added to specific routes):
+#
+# - name: rate-limiting
+#   route: stream-reserve
+#   config:
+#     minute: 60
+#     hour: 1000
+#     policy: local
+#     fault_tolerant: true
+#     hide_client_headers: false
+
+# IP restriction for admin endpoints
+# - name: ip-restriction
+#   route: mediamtx-paths
+#   config:
+#     allow:
+#       - 10.0.0.0/8
+#       - 172.16.0.0/12
+#       - 192.168.0.0/16
+
+###############################################
+# UPSTREAMS (for load balancing - future)
+###############################################
+
+# upstreams:
+#   - name: vms-service-upstream
+#     algorithm: round-robin
+#     hash_on: none
+#     hash_fallback: none
+#     hash_on_cookie_path: /
+#     slots: 10000
+#     healthchecks:
+#       active:
+#         type: http
+#         http_path: /health
+#         timeout: 5
+#         concurrency: 10
+#         healthy:
+#           interval: 30
+#           successes: 2
+#         unhealthy:
+#           interval: 30
+#           http_failures: 3
+#           timeouts: 3
+#     targets:
+#       - target: vms-service:8081
+#         weight: 100
+
+###############################################
+# CONSUMERS (for authentication - future)
+###############################################
+
+# consumers:
+#   - username: rta-admin
+#     custom_id: admin-001
+#     tags:
+#       - admin
+#     keyauth_credentials:
+#       - key: ${ADMIN_API_KEY}
+#
+#   - username: dubai-police-operator
+#     custom_id: dp-001
+#     tags:
+#       - dubai-police
+#       - operator
+#     keyauth_credentials:
+#       - key: ${DP_API_KEY}
+
+###############################################
+# CUSTOM PLUGINS (Lua)
+###############################################
+
+# Custom plugin for quota validation
+# Located at: /usr/local/share/lua/5.1/kong/plugins/quota-validator/
+#
+# plugins:
+#   - name: quota-validator
+#     enabled: true
+#     config:
+#       stream_counter_url: http://stream-counter:8087
+#       validate_before_proxy: true
+#       cache_ttl: 5
+
+###############################################
+# NOTES
+###############################################
+
+# Deployment:
+# 1. Development: Use DB-less mode with this declarative config
+#    - kong start -c kong.conf --declarative-config kong.yml
+#
+# 2. Production: Use PostgreSQL database mode
+#    - deck sync --config kong.yml
+#
+# Environment Variables:
+# - KONG_DATABASE=off (for declarative mode)
+# - KONG_DECLARATIVE_CONFIG=/etc/kong/kong.yml
+# - KONG_PROXY_LISTEN=0.0.0.0:8000
+# - KONG_ADMIN_LISTEN=0.0.0.0:8001
+# - KONG_LOG_LEVEL=info
+#
+# Testing:
+# - Validate config: kong config parse kong.yml
+# - Check routes: curl http://localhost:8001/routes
+# - Check services: curl http://localhost:8001/services
+# - Check plugins: curl http://localhost:8001/plugins
+#
+# API Gateway URLs:
+# - Proxy (client traffic): http://kong:8000
+# - Admin API (management): http://kong:8001
+# - Metrics: http://kong:8001/metrics

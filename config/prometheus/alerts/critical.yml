@@ -1,0 +1,205 @@
+# Critical Alerting Rules for RTA CCTV System
+# These alerts require immediate attention
+
+groups:
+  - name: critical_alerts
+    interval: 30s
+    rules:
+      # Service Health Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} on {{ $labels.instance }} has been down for more than 2 minutes."
+
+      # Go API Alerts
+      - alert: HighAPIErrorRate
+        expr: (rate(http_requests_total{job="go-api",status=~"5.."}[5m]) / rate(http_requests_total{job="go-api"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on Go API"
+          description: "Go API error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: APIHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="go-api"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile latency is {{ $value }}s for Go API."
+
+      # LiveKit Streaming Alerts
+      - alert: LiveKitHighLatency
+        expr: histogram_quantile(0.95, rate(livekit_room_rtt_seconds_bucket[5m])) > 1
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High LiveKit streaming latency"
+          description: "95th percentile RTT is {{ $value }}s, exceeding 1 second threshold."
+
+      - alert: LiveKitRoomFailures
+        expr: rate(livekit_room_connection_failures_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High LiveKit connection failure rate"
+          description: "LiveKit connection failures: {{ $value }} per second."
+
+      # Stream Reservation Alerts
+      - alert: StreamReservationFailures
+        expr: rate(stream_reservations_total{status="failed"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High stream reservation failure rate"
+          description: "Stream reservation failures: {{ $value }} per second."
+
+      - alert: QuotaExceeded
+        expr: stream_counter_quota_exceeded_total > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agency stream quota exceeded"
+          description: "Agency {{ $labels.source }} has exceeded stream quota {{ $value }} times."
+
+      # Playback Service Alerts
+      - alert: PlaybackCacheLowHitRate
+        expr: (playback_cache_hits_total / (playback_cache_hits_total + playback_cache_misses_total)) < 0.3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low playback cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}, below 30% threshold."
+
+      - alert: PlaybackTransmuxFailures
+        expr: rate(playback_transmux_failures_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High playback transmux failure rate"
+          description: "Transmux failures: {{ $value }} per second."
+
+      # Storage Alerts
+      - alert: MinIOHighErrorRate
+        expr: rate(minio_s3_requests_errors_total[5m]) / rate(minio_s3_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High MinIO error rate"
+          description: "MinIO error rate is {{ $value | humanizePercentage }}."
+
+      - alert: MinIOStorageFull
+        expr: (minio_cluster_capacity_usable_free_bytes / minio_cluster_capacity_usable_total_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MinIO storage critically low"
+          description: "Only {{ $value | humanizePercentage }} free space remaining."
+
+      # Database Alerts
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is unreachable."
+
+      - alert: PostgreSQLHighConnections
+        expr: (pg_stat_database_numbackends / pg_settings_max_connections) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL connection pool nearly exhausted"
+          description: "PostgreSQL using {{ $value | humanizePercentage }} of max connections."
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_activity_max_tx_duration[5m]) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Long-running queries detected ({{ $value }}s)."
+
+      # Valkey (Redis) Alerts
+      - alert: ValkeyDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Valkey is down"
+          description: "Valkey cache is unreachable."
+
+      - alert: ValkeyHighMemory
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Valkey memory usage high"
+          description: "Valkey using {{ $value | humanizePercentage }} of max memory."
+
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: (100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}."
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low memory available on {{ $labels.instance }}"
+          description: "Only {{ $value | humanizePercentage }} memory available on {{ $labels.instance }}."
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Only {{ $value | humanizePercentage }} disk space available on {{ $labels.instance }} at {{ $labels.mountpoint }}."
+
+      # Container Alerts
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} high memory usage"
+          description: "Container using {{ $value | humanizePercentage }} of memory limit."
+
+      - alert: ContainerRestarting
+        expr: rate(container_last_seen[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} restarting frequently"
+          description: "Container has restarted {{ $value }} times in 5 minutes."

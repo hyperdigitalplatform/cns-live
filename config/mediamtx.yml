@@ -1,0 +1,247 @@
+# MediaMTX Configuration for RTA CCTV System
+# RTSP Server for ingesting Milestone VMS streams and distributing to viewers
+
+###############################################
+# General Configuration
+###############################################
+
+# Log level: debug, info, warn
+logLevel: info
+
+# Log destinations: stdout, file, syslog
+logDestinations: [stdout]
+
+# Log file path (when using file destination)
+# logFile: /var/log/mediamtx.log
+
+# Read timeout for connections (seconds)
+readTimeout: 10s
+
+# Write timeout for connections (seconds)
+writeTimeout: 10s
+
+# Read buffer size (bytes)
+readBufferCount: 512
+
+# API server for metrics and control
+api: yes
+apiAddress: 0.0.0.0:9997
+
+# Metrics server (Prometheus format)
+metrics: yes
+metricsAddress: 0.0.0.0:9998
+
+# PPROF server for debugging (disable in production)
+pprof: no
+pprofAddress: 127.0.0.1:9999
+
+# Internal users for API, metrics, and stream access
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []  # Allow from any IP (internal Docker network)
+    permissions:
+      - action: api
+      - action: metrics
+      - action: pprof
+      - action: read
+        path:
+
+###############################################
+# RTSP Server Configuration
+###############################################
+
+# Enable RTSP protocol
+rtsp: yes
+
+# RTSP listening addresses
+protocols: [tcp]
+rtspAddress: 0.0.0.0:8554
+
+# Enable RTP over TCP (required for most networks with firewalls)
+rtpAddress: ""
+rtcpAddress: ""
+
+# Enable authentication (disabled for internal network)
+# rtspAuthMethods: [basic]
+
+# Encryption (disabled for internal use, enable for production)
+encryption: "no"
+# serverKey: /path/to/server.key
+# serverCert: /path/to/server.crt
+
+###############################################
+# HLS Server Configuration (for web playback)
+###############################################
+
+# Enable HLS protocol for web browsers
+hls: yes
+hlsAddress: 0.0.0.0:8888
+
+# HLS always remux video
+hlsAlwaysRemux: yes
+
+# HLS variant (lowLatency or mpegts)
+# lowLatency: uses fMP4 segments for <2s latency
+# mpegts: uses standard MPEG-TS for better compatibility
+hlsVariant: lowLatency
+
+# HLS segment count (number of segments in playlist)
+hlsSegmentCount: 7
+
+# HLS segment duration (seconds)
+hlsSegmentDuration: 1s
+
+# HLS part duration (for low latency mode)
+hlsPartDuration: 200ms
+
+# HLS segment max size (bytes)
+hlsSegmentMaxSize: 50M
+
+# Allow HLS CORS (required for web browsers)
+hlsAllowOrigin: "*"
+
+# HLS encryption (disabled for internal use)
+hlsEncryption: no
+
+###############################################
+# WebRTC Server Configuration (ultra-low latency)
+###############################################
+
+# Enable WebRTC for <500ms latency
+webrtc: yes
+webrtcAddress: 0.0.0.0:8889
+
+# WebRTC ICE servers (STUN/TURN)
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+
+# Allow WebRTC CORS
+webrtcAllowOrigin: "*"
+
+# WebRTC encryption (disabled for internal use)
+# webrtcServerKey: /path/to/server.key
+# webrtcServerCert: /path/to/server.crt
+
+###############################################
+# Recording Configuration
+###############################################
+
+# Enable recording to disk
+# record: yes
+# recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+# recordFormat: fmp4
+# recordPartDuration: 1s
+# recordSegmentDuration: 1h
+# recordDeleteAfter: 2160h  # 90 days
+
+###############################################
+# Path Defaults (applied to all paths)
+###############################################
+
+pathDefaults:
+  # Source settings
+  source: publisher
+
+  # Allow any source to publish
+  # publishUser:
+  # publishPass:
+  # publishIPs: []
+
+  # Allow any client to read
+  # readUser:
+  # readPass:
+  # readIPs: []
+
+  # Run on init (when path is created)
+  # runOnInit: ffmpeg -i rtsp://source -c copy -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH
+
+  # Run on demand (when first reader connects)
+  runOnDemand: ""
+  runOnDemandRestart: no
+  runOnDemandStartTimeout: 10s
+  runOnDemandCloseAfter: 10s
+
+  # Run on ready (when source is ready)
+  # runOnReady: echo "Stream $MTX_PATH is ready"
+
+  # Run on read (when reader connects)
+  # runOnRead: echo "Reader connected to $MTX_PATH"
+
+  # Run on unread (when last reader disconnects)
+  # runOnUnread: echo "Last reader disconnected from $MTX_PATH"
+
+  # Run on record (when recording segment completes)
+  # runOnRecordSegmentComplete: echo "Recording segment complete: $MTX_SEGMENT_PATH"
+
+###############################################
+# Path-Specific Configurations
+###############################################
+
+paths:
+  # Default path for all streams
+  # Streams will be available at: rtsp://mediamtx:8554/{camera_id}
+
+  # Dubai Police Cameras (50 max concurrent)
+  dubai_police_~id:
+    source: publisher
+    # Optional: Run on demand to start RTSP pull from Milestone
+    # runOnDemand: ffmpeg -i rtsp://milestone:554/dubai_police_${id} -c copy -f rtsp rtsp://localhost:8554/dubai_police_${id}
+    runOnDemandRestart: yes
+    runOnDemandStartTimeout: 10s
+    runOnDemandCloseAfter: 10s
+
+  # Metro Cameras (30 max concurrent)
+  metro_~id:
+    source: publisher
+    runOnDemandRestart: yes
+    runOnDemandStartTimeout: 10s
+    runOnDemandCloseAfter: 10s
+
+  # Bus Cameras (20 max concurrent)
+  bus_~id:
+    source: publisher
+    runOnDemandRestart: yes
+    runOnDemandStartTimeout: 10s
+    runOnDemandCloseAfter: 10s
+
+  # Other Agency Cameras (400 max concurrent)
+  other_~id:
+    source: publisher
+    runOnDemandRestart: yes
+    runOnDemandStartTimeout: 10s
+    runOnDemandCloseAfter: 10s
+
+  # Test stream for development
+  test:
+    source: publisher
+    # Test with: ffmpeg -re -i test.mp4 -c copy -f rtsp rtsp://localhost:8554/test
+
+  # Camera streams (pulled from RTSP cameras on demand)
+  # Pattern: camera_cam-001-sheikh-zayed, camera_cam-002-metro-station, etc.
+  camera_~cameraId:
+    # This will be dynamically configured by go-api
+    # MediaMTX will pull from the RTSP URL provided via its API
+    source: publisher
+
+    # On-demand settings
+    runOnDemandRestart: yes
+    runOnDemandStartTimeout: 15s
+    runOnDemandCloseAfter: 10s
+
+###############################################
+# Performance Tuning
+###############################################
+
+# Max number of concurrent connections
+# This should match total stream limit (500)
+# Each stream can have multiple viewers
+# Estimated: 500 streams × 10 viewers = 5000 connections
+# Set conservatively for hardware footprint
+# maxConnections: 5000
+
+# UDP multicast range (for future multicast support)
+# udpMulticastRange: 239.0.0.0/8
+
+# Disable external authentication (use internal quota management via Stream Counter)
+# externalAuthenticationURL: http://stream-counter:8087/api/v1/auth/validate

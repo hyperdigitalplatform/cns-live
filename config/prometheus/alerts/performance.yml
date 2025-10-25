@@ -1,0 +1,122 @@
+# Performance Alerting Rules for RTA CCTV System
+# These alerts indicate performance degradation
+
+groups:
+  - name: performance_alerts
+    interval: 1m
+    rules:
+      # Stream Performance
+      - alert: StreamCountDropping
+        expr: rate(livekit_track_published_total[5m]) < rate(livekit_track_unpublished_total[5m])
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Stream tracks being unpublished faster than published"
+          description: "Potential streaming stability issues detected."
+
+      - alert: HighBandwidthUsage
+        expr: rate(livekit_bytes_sent_total[5m]) > 1000000000  # 1 Gbps
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "High bandwidth usage on LiveKit"
+          description: "Bandwidth usage: {{ $value | humanize }}bps."
+
+      # Recording Performance
+      - alert: RecordingQueueBacklog
+        expr: recording_queue_depth > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recording queue backlog building up"
+          description: "Recording queue depth: {{ $value }} jobs pending."
+
+      - alert: SlowRecordingProcessing
+        expr: histogram_quantile(0.95, rate(recording_processing_duration_seconds_bucket[10m])) > 300
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow recording processing"
+          description: "95th percentile processing time: {{ $value }}s (>5 minutes)."
+
+      # Playback Performance
+      - alert: SlowPlaybackTransmux
+        expr: histogram_quantile(0.95, rate(playback_transmux_duration_seconds_bucket[10m])) > 30
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow playback transmuxing"
+          description: "95th percentile transmux time: {{ $value }}s (>30 seconds)."
+
+      - alert: HighPlaybackConcurrency
+        expr: playback_active_sessions > 100
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "High playback concurrency"
+          description: "Active playback sessions: {{ $value }}."
+
+      # API Performance
+      - alert: HighRequestRate
+        expr: rate(http_requests_total{job="go-api"}[5m]) > 1000
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "High API request rate"
+          description: "Request rate: {{ $value }} req/s."
+
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time: {{ $value }}s."
+
+      # Cache Performance
+      - alert: CacheEvictionRate
+        expr: rate(playback_cache_evictions_total[10m]) > 10
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "High cache eviction rate"
+          description: "Cache evictions: {{ $value }} per second. Consider increasing cache size."
+
+      # FFmpeg Performance
+      - alert: HighFFmpegCPU
+        expr: rate(process_cpu_seconds_total{job="playback-service"}[5m]) > 3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage in playback service"
+          description: "FFmpeg consuming {{ $value }} CPU cores."
+
+      # Network Performance
+      - alert: HighNetworkErrors
+        expr: rate(node_network_receive_errs_total[5m]) + rate(node_network_transmit_errs_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High network error rate on {{ $labels.instance }}"
+          description: "Network errors: {{ $value }} per second."
+
+      # Metadata Service Performance
+      - alert: SlowMetadataIndexing
+        expr: histogram_quantile(0.95, rate(metadata_indexing_duration_seconds_bucket[10m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow metadata indexing"
+          description: "95th percentile indexing time: {{ $value }}s."

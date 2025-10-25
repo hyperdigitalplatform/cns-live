@@ -1,0 +1,154 @@
+# Alertmanager Configuration for RTA CCTV System
+
+global:
+  resolve_timeout: 5m
+  smtp_from: 'alerts@rta-cctv.ae'
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_auth_username: 'alerts@rta-cctv.ae'
+  smtp_auth_password: 'changeme'
+  smtp_require_tls: true
+
+# Templates for alert notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# The root route with all parameters, which are inherited by the child routes
+route:
+  receiver: 'default-receiver'
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 0s
+      group_interval: 5m
+      repeat_interval: 3h
+      continue: true
+
+    # Warning alerts - notify but less frequently
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 12h
+
+    # Info alerts - daily digest
+    - match:
+        severity: info
+      receiver: 'info-receiver'
+      group_wait: 5m
+      group_interval: 1h
+      repeat_interval: 24h
+
+    # Service-specific routes
+    - match:
+        service: livekit
+      receiver: 'streaming-team'
+      continue: true
+
+    - match:
+        service: playback-service
+      receiver: 'playback-team'
+      continue: true
+
+    - match_re:
+        service: (postgres|minio|valkey)
+      receiver: 'infrastructure-team'
+      continue: true
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # Inhibit all alerts for a service if it's down
+  - source_match:
+      severity: 'critical'
+      alertname: 'ServiceDown'
+    target_match_re:
+      severity: 'warning|info'
+    equal: ['service']
+
+  # Inhibit low disk space if disk is full
+  - source_match:
+      alertname: 'HighDiskUsage'
+    target_match:
+      alertname: 'DiskFilling'
+    equal: ['instance']
+
+  # Inhibit database slow queries if database is down
+  - source_match:
+      alertname: 'PostgreSQLDown'
+    target_match:
+      alertname: 'PostgreSQLSlowQueries'
+
+# Receiver configurations
+receivers:
+  # Default receiver (catch-all)
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'ops-team@rta-cctv.ae'
+        headers:
+          Subject: '[RTA CCTV] {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.default.html" . }}'
+    webhook_configs:
+      - url: 'http://go-api:8088/api/v1/alerts/webhook'
+        send_resolved: true
+
+  # Critical alerts - multiple channels
+  - name: 'critical-receiver'
+    email_configs:
+      - to: 'ops-team@rta-cctv.ae,oncall@rta-cctv.ae'
+        headers:
+          Subject: '[CRITICAL] RTA CCTV Alert: {{ .GroupLabels.alertname }}'
+          Priority: 'urgent'
+        html: '{{ template "email.critical.html" . }}'
+    # Slack integration (optional)
+    # slack_configs:
+    #   - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+    #     channel: '#alerts-critical'
+    #     title: '[CRITICAL] {{ .GroupLabels.alertname }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+    #     send_resolved: true
+    # PagerDuty integration (optional)
+    # pagerduty_configs:
+    #   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+    #     description: '{{ .GroupLabels.alertname }}: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+  # Warning alerts
+  - name: 'warning-receiver'
+    email_configs:
+      - to: 'ops-team@rta-cctv.ae'
+        headers:
+          Subject: '[WARNING] RTA CCTV: {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.warning.html" . }}'
+
+  # Info alerts - daily digest
+  - name: 'info-receiver'
+    email_configs:
+      - to: 'ops-team@rta-cctv.ae'
+        headers:
+          Subject: '[INFO] RTA CCTV Daily Report'
+        html: '{{ template "email.info.html" . }}'
+
+  # Team-specific receivers
+  - name: 'streaming-team'
+    email_configs:
+      - to: 'streaming-team@rta-cctv.ae'
+        headers:
+          Subject: '[LiveKit] {{ .GroupLabels.alertname }}'
+
+  - name: 'playback-team'
+    email_configs:
+      - to: 'playback-team@rta-cctv.ae'
+        headers:
+          Subject: '[Playback] {{ .GroupLabels.alertname }}'
+
+  - name: 'infrastructure-team'
+    email_configs:
+      - to: 'infra-team@rta-cctv.ae'
+        headers:
+          Subject: '[Infrastructure] {{ .GroupLabels.alertname }}'
