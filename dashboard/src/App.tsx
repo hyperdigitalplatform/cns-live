@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { LiveView } from '@/pages/LiveView';
+import { LiveViewEnhanced } from '@/pages/LiveViewEnhanced';
 import { PlaybackView } from '@/pages/PlaybackView';
 import { Toaster } from 'react-hot-toast';
 import { Video, History, Activity, Settings } from 'lucide-react';
@@ -72,7 +73,8 @@ function App() {
     <BrowserRouter>
       <AppLayout>
         <Routes>
-          <Route path="/" element={<LiveView />} />
+          <Route path="/" element={<LiveViewEnhanced />} />
+          <Route path="/legacy" element={<LiveView />} />
           <Route path="/playback" element={<PlaybackView />} />
           <Route
             path="/analytics"

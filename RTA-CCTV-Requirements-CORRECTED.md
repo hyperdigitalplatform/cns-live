@@ -1197,37 +1197,51 @@ type Hub struct {
 
 ### **3.2: React Dashboard**
 
-**Purpose**: Operator dashboard for viewing 64 simultaneous streams
+**Purpose**: Operator dashboard for viewing up to 36 simultaneous streams with advanced camera organization
 
-**FEATURES**:
-- Grid layouts: 2×2, 3×3, 4×4, 16-way hotspot, 64-way hotspot
-- Drag-and-drop camera placement
-- LiveKit WebRTC integration
-- HLS playback for recordings
-- PTZ controls with joystick
-- Clip creation and management
-- Search (time range, tags, AI objects)
-- Bilingual UI (Arabic/English with RTL)
-- Real-time agency quota display
+**CAMERA ORGANIZATION FEATURES**:
+- **Tree-style folder structure** with unlimited nesting depth
+- **Drag-and-drop organization**: Cameras and folders can be reorganized
+- **Default folders** by agency (Dubai Police, Sharjah Police, Metro, Taxi, Parking)
+- **Search integration** across all folders and cameras (English/Arabic)
+- **Persistent folder structure** saved in browser local storage
+- **View modes**: Tree view (hierarchical) and List view (flat)
+- **Folder management**: Create, rename, delete, move folders with context menus
+- **Unorganized category**: Cameras not in folders automatically grouped
 
 **GRID LAYOUTS**:
 ```typescript
 const GRID_LAYOUTS = {
-  "2x2": { rows: 2, cols: 2, cells: 4 },
-  "3x3": { rows: 3, cols: 3, cells: 9 },
-  "4x4": { rows: 4, cols: 4, cells: 16 },
-  "16-hotspot": {
-    rows: 4, cols: 4,
-    hotspot: { row: 0, col: 0, rowSpan: 3, colSpan: 3 },
-    cells: 7 + 1  // 3×3 main + 7 small
-  },
-  "64-hotspot": {
-    rows: 8, cols: 8,
-    hotspot: { row: 0, col: 0, rowSpan: 7, colSpan: 7 },
-    cells: 15 + 1  // 7×7 main + 15 small
-  }
+  "1x1": { rows: 1, cols: 1, cells: 1 },   // Single camera focus
+  "2x2": { rows: 2, cols: 2, cells: 4 },   // Small control room
+  "3x3": { rows: 3, cols: 3, cells: 9 },   // Default - Balanced view
+  "4x4": { rows: 4, cols: 4, cells: 16 },  // Medium control room
+  "2x3": { rows: 2, cols: 3, cells: 6 },   // Portrait displays
+  "3x4": { rows: 3, cols: 4, cells: 12 },  // Widescreen displays
+  "4x5": { rows: 4, cols: 5, cells: 20 },  // Large control room
+  "5x5": { rows: 5, cols: 5, cells: 25 },  // Command center
+  "6x6": { rows: 6, cols: 6, cells: 36 }   // Operations center (max)
 };
 ```
+
+**DRAG-AND-DROP OPERATIONS**:
+1. **Camera → Folder**: Drag camera from sidebar/grid to folder for organization
+2. **Camera → Grid Cell**: Drag camera to specific grid cell to display stream
+3. **Folder → Folder**: Drag folder to reorganize hierarchy (prevents circular refs)
+4. **Double-click auto-assign**: Camera auto-places in next available grid cell
+5. **Visual feedback**: Blue highlight on valid drop targets, animations
+
+**CORE FEATURES**:
+- LiveKit WebRTC integration (~450ms latency via WHIP)
+- HLS playback for recordings
+- PTZ controls with joystick
+- Clip creation and management
+- Search (camera name/ID, time range, tags, AI objects)
+- Bilingual UI (Arabic/English with RTL)
+- Real-time agency quota display
+- Collapsible sidebar for more screen space
+- Fullscreen mode for individual cameras
+- Keyboard shortcuts for common actions
 
 **PERFORMANCE OPTIMIZATIONS**:
 1. **Viewport-based rendering** (Intersection Observer)
@@ -1240,15 +1254,42 @@ const GRID_LAYOUTS = {
 
 **STATE MANAGEMENT** (Zustand):
 ```typescript
+// Camera Store - Camera list and selection
 interface CameraStore {
   cameras: Camera[];
-  activeCameras: Map<number, StreamState>;
-  agencyLimits: Map<Source, LimitStatus>;
-  layout: GridLayout;
+  selectedCamera: Camera | null;
+  loading: boolean;
+  fetchCameras: () => Promise<void>;
+  selectCamera: (camera: Camera | null) => void;
+}
 
-  addCamera: (gridIndex: number, cameraId: string) => Promise<void>;
-  removeCamera: (gridIndex: number) => void;
-  changeLayout: (layout: string) => void;
+// Folder Store - Camera organization (NEW)
+interface FolderStore {
+  folders: CameraFolder[];
+  expandedFolders: Set<string>;
+  selectedFolderId: string | null;
+
+  createFolder: (name: string, nameAr?: string, parentId?: string) => CameraFolder;
+  updateFolder: (id: string, updates: Partial<CameraFolder>) => void;
+  deleteFolder: (id: string) => void;
+  moveFolder: (folderId: string, newParentId: string | null) => void;
+
+  addCameraToFolder: (cameraId: string, folderId: string) => void;
+  removeCameraFromFolder: (cameraId: string, folderId: string) => void;
+  moveCameraBetweenFolders: (cameraId: string, sourceFolderId: string | null, targetFolderId: string | null) => void;
+
+  toggleFolderExpanded: (folderId: string) => void;
+  buildFolderTree: (cameras: Camera[]) => CameraFolderTree[];
+  initializeDefaultFolders: () => void;
+}
+
+// Stream Store - Active stream management
+interface StreamStore {
+  activeStreams: Map<string, StreamReservation>;
+  agencyLimits: Map<Source, LimitStatus>;
+
+  reserveStream: (cameraId: string) => Promise<StreamReservation>;
+  releaseStream: (reservationId: string) => Promise<void>;
   checkAgencyLimit: (source: Source) => boolean;
 }
 ```
@@ -1378,12 +1419,29 @@ document.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
 ```
 
 **DELIVERABLES**:
-1. Complete React application
-2. Component library (Storybook)
-3. E2E tests (Playwright)
-4. Performance benchmarks
-5. Accessibility audit (WCAG 2.1 AA)
-6. Docker build (<500KB gzipped bundle)
+1. Complete React application with folder management
+2. Component library:
+   - CameraTreeView (recursive folder tree with drag-and-drop)
+   - CameraSidebarNew (integrated sidebar with tree/list views)
+   - StreamGridEnhanced (grid with drop zones and cell management)
+   - LiveViewEnhanced (integrated live view page)
+3. Zustand stores:
+   - cameraStore (existing camera management)
+   - folderStore (NEW - folder CRUD and tree operations)
+   - streamStore (stream reservations)
+4. NPM Dependencies:
+   - @dnd-kit/core@^6.1.0 (drag-and-drop core)
+   - @dnd-kit/sortable@^8.0.0 (sortable lists)
+   - @dnd-kit/utilities@^3.2.2 (utility functions)
+   - zustand@^4.4.7 (with persist middleware)
+5. Documentation:
+   - DASHBOARD_FEATURES.md (complete user guide)
+   - INSTALLATION.md (setup and deployment)
+   - DASHBOARD_SUMMARY.md (implementation overview)
+6. E2E tests (Playwright)
+7. Performance benchmarks
+8. Accessibility audit (WCAG 2.1 AA)
+9. Docker build (<500KB gzipped bundle)
 
 ---
 

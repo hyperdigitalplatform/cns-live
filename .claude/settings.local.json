@@ -51,7 +51,9 @@
       "Bash(docker-compose down:*)",
       "Bash(docker images:*)",
       "WebFetch(domain:docs.livekit.io)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(npm install)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

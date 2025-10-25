@@ -166,3 +166,38 @@ export interface APIError {
   message_ar?: string;
   details?: Record<string, unknown>;
 }
+
+// Camera Folder types (Tree structure for organizing cameras)
+export interface CameraFolder {
+  id: string;
+  name: string;
+  name_ar?: string;
+  parent_id: string | null; // null for root folders
+  camera_ids: string[];     // Cameras directly in this folder
+  order: number;            // Display order
+  expanded?: boolean;       // UI state for tree collapse/expand
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CameraFolderTree extends CameraFolder {
+  children: CameraFolderTree[];
+  cameras: Camera[];
+  depth: number;
+}
+
+// Drag and drop types
+export interface DragItem {
+  type: 'camera' | 'folder';
+  id: string;
+  sourceFolder: string | null;
+  data: Camera | CameraFolder;
+}
+
+export interface DropTarget {
+  type: 'folder' | 'grid-cell' | 'trash';
+  id: string;
+  index?: number; // For grid cell drops
+}
