@@ -44,6 +44,8 @@ Welcome to the RTA CCTV Video Management System documentation.
 | Document | Purpose | Audience |
 |----------|---------|----------|
 | [Architecture](architecture.md) | System design, components, data flow | Developers, Architects |
+| [Multi-Viewer Streaming](MULTI_VIEWER_STREAMING.md) | Multi-viewer architecture, LiveKit SFU | Developers, Architects |
+| [PTZ Controls Requirements](PTZ_CONTROLS_REQUIREMENTS.md) | PTZ controls UI/UX specifications | Developers, UI/UX |
 | [Deployment](deployment.md) | Installation, configuration | DevOps, Developers |
 | [Operations](operations.md) | Daily operations, troubleshooting | Operations, SRE |
 | [API Reference](api.md) | API endpoints, usage | Developers, Integrators |

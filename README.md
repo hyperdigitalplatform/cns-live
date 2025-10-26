@@ -241,6 +241,8 @@ docker-compose up -d --scale go-api=2
 
 - [Architecture](docs/architecture.md)
 - [API Documentation](docs/api.md)
+- [Multi-Viewer Streaming](docs/MULTI_VIEWER_STREAMING.md)
+- [PTZ Controls Requirements](docs/PTZ_CONTROLS_REQUIREMENTS.md)
 - [Deployment Guide](docs/deployment.md)
 - [Operations Runbook](docs/operations.md)
 - [Troubleshooting](docs/troubleshooting.md)

@@ -18,12 +18,14 @@ interface LiveStreamPlayerProps {
   camera: Camera;
   quality?: 'high' | 'medium' | 'low';
   onError?: (error: Error) => void;
+  cellSize?: 'hotspot' | 'large' | 'medium' | 'small';
 }
 
 export function LiveStreamPlayer({
   camera,
   quality = 'medium',
   onError,
+  cellSize = 'medium',
 }: LiveStreamPlayerProps) {
   const [reservation, setReservation] = useState<StreamReservation | null>(
     null
@@ -110,12 +112,9 @@ export function LiveStreamPlayer({
     setShowPTZ(true);
   };
 
-  const handleTogglePin = () => {
-    setPTZPinned(!ptzPinned);
-    if (ptzPinned) {
-      // If unpinning, hide the controls
-      setShowPTZ(false);
-    }
+  const handlePTZClose = () => {
+    setPTZPinned(false);
+    setShowPTZ(false);
   };
 
   return (
@@ -129,11 +128,12 @@ export function LiveStreamPlayer({
     >
       <LiveStreamView
         camera={camera}
+        cellSize={cellSize}
         showPTZ={showPTZ}
         ptzPinned={ptzPinned}
         onShowPTZ={setShowPTZ}
         onPTZClick={handlePTZClick}
-        onTogglePin={handleTogglePin}
+        onPTZClose={handlePTZClose}
       />
     </LiveKitRoom>
   );
@@ -141,18 +141,20 @@ export function LiveStreamPlayer({
 
 function LiveStreamView({
   camera,
+  cellSize,
   showPTZ,
   ptzPinned,
   onShowPTZ,
   onPTZClick,
-  onTogglePin,
+  onPTZClose,
 }: {
   camera: Camera;
+  cellSize?: 'hotspot' | 'large' | 'medium' | 'small';
   showPTZ: boolean;
   ptzPinned: boolean;
   onShowPTZ: (show: boolean) => void;
   onPTZClick: () => void;
-  onTogglePin: () => void;
+  onPTZClose: () => void;
 }) {
   const room = useRoomContext();
   const tracks = useTracks([Track.Source.Camera]);
@@ -170,24 +172,8 @@ function LiveStreamView({
 
   const videoTrack = tracks[0];
 
-  const handleVideoClick = () => {
-    if (!camera.ptz_enabled) return;
-
-    if (ptzPinned) {
-      // Click outside PTZ controls to unpin
-      onTogglePin();
-    } else {
-      // Click to pin
-      onPTZClick();
-    }
-  };
-
   return (
     <div
-      className="relative h-full bg-black group"
-      onMouseEnter={() => !ptzPinned && camera.ptz_enabled && onShowPTZ(true)}
-      onMouseLeave={() => !ptzPinned && onShowPTZ(false)}
-      onClick={handleVideoClick}
     >
       <VideoTrack
         trackRef={videoTrack}
@@ -205,21 +191,12 @@ function LiveStreamView({
         LIVE
       </div>
 
-      {/* PTZ hint (only show on hover if PTZ enabled and not pinned) */}
-      {camera.ptz_enabled && !ptzPinned && (
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-          <div className="bg-black/50 px-4 py-2 rounded-lg text-white text-sm">
-            Click for PTZ Controls
-          </div>
-        </div>
-      )}
 
       {/* PTZ Controls Overlay */}
-      {showPTZ && (
+      {camera.ptz_enabled {showPTZ && ({showPTZ && ( (
         <PTZControls
           camera={camera}
-          onTogglePin={onTogglePin}
-          isPinned={ptzPinned}
+          cellSize={cellSize}
         />
       )}
     </div>

@@ -7,7 +7,8 @@ import {
   ZoomIn,
   ZoomOut,
   Home,
-  X,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { api } from '@/services/api';
 import { cn } from '@/utils/cn';
@@ -15,11 +16,17 @@ import type { Camera } from '@/types';
 
 interface PTZControlsProps {
   camera: Camera;
-  onClose: () => void;
+  onTogglePin: () => void;
   isPinned: boolean;
+  cellSize?: 'hotspot' | 'large' | 'medium' | 'small';
 }
 
-export function PTZControls({ camera, onClose, isPinned }: PTZControlsProps) {
+export function PTZControls({
+  camera,
+  onTogglePin,
+  isPinned,
+  cellSize = 'medium',
+}: PTZControlsProps) {
   const [activeButton, setActiveButton] = useState<string | null>(null);
 
   const handlePTZCommand = async (
@@ -44,165 +51,176 @@ export function PTZControls({ camera, onClose, isPinned }: PTZControlsProps) {
   };
 
   if (!camera.ptz_enabled) {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div className="bg-white rounded-lg p-6 text-center">
-          <p className="text-gray-700">PTZ not available for this camera</p>
-          <button
-            onClick={onClose}
-            className="mt-4 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
+    return null;
   }
 
+  // Responsive sizing based on cell size
+  const sizeClasses = {
+    hotspot: {
+      container: 'w-16',
+      button: 'h-11 w-11',
+      icon: 'w-5 h-5',
+      gap: 'gap-1.5',
+      padding: 'p-2',
+    },
+    large: {
+      container: 'w-14',
+      button: 'h-9 w-9',
+      icon: 'w-4 h-4',
+      gap: 'gap-1',
+      padding: 'p-1.5',
+    },
+    medium: {
+      container: 'w-12',
+      button: 'h-8 w-8',
+      icon: 'w-3.5 h-3.5',
+      gap: 'gap-1',
+      padding: 'p-1',
+    },
+    small: {
+      container: 'w-10',
+      button: 'h-6 w-6',
+      icon: 'w-3 h-3',
+      gap: 'gap-0.5',
+      padding: 'p-1',
+    },
+  };
+
+  const size = sizeClasses[cellSize];
+
+  const buttonClass = cn(
+    'bg-white/10 hover:bg-white/20 rounded transition-colors active:bg-white/30 flex items-center justify-center',
+    size.button
+  );
+
+  const activeButtonClass = cn(buttonClass, 'bg-white/30 ring-1 ring-white/50');
+
   return (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className="pointer-events-auto">
-        {/* Close/Back button (top-left when pinned) */}
-        {isPinned && (
-          <button
-            onClick={onClose}
-            className="absolute top-4 left-4 p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg transition-colors"
-            title="Close PTZ Controls"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
+    <div
+      className={cn(
+        'absolute left-0 top-0 bottom-0 flex flex-col bg-black/80 backdrop-blur-md border-r border-white/10 pointer-events-auto z-10',
+        size.container,
+        size.padding
+      )}
+      onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
+    >
+      {/* Directional controls - Single column */}
+      <div className={cn('flex flex-col', size.gap)}>
+        {/* Up */}
+        <button
+          onMouseDown={() => handleMouseDown('tilt_up')}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={
+            activeButton === 'tilt_up' ? activeButtonClass : buttonClass
+          }
+          title="Tilt Up"
+        >
+          <ChevronUp className={cn('text-white', size.icon)} />
+        </button>
 
-        {/* PTZ Control Panel */}
-        <div className="bg-black/80 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-white/20">
-          <div className="flex flex-col gap-4">
-            {/* Camera name */}
-            <div className="text-center text-white text-sm font-medium mb-2">
-              PTZ Controls - {camera.name}
-            </div>
+        {/* Left */}
+        <button
+          onMouseDown={() => handleMouseDown('pan_left')}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={
+            activeButton === 'pan_left' ? activeButtonClass : buttonClass
+          }
+          title="Pan Left"
+        >
+          <ChevronLeft className={cn('text-white', size.icon)} />
+        </button>
 
-            {/* Directional Pad */}
-            <div className="grid grid-cols-3 gap-2">
-              {/* Top row */}
-              <div />
-              <button
-                onMouseDown={() => handleMouseDown('tilt_up')}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className={cn(
-                  'p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-colors active:bg-white/30',
-                  activeButton === 'tilt_up' && 'bg-white/30'
-                )}
-                title="Tilt Up"
-              >
-                <ChevronUp className="w-6 h-6 text-white" />
-              </button>
-              <div />
+        {/* Home */}
+        <button
+          onClick={() => handlePTZCommand('home')}
+          className={cn(
+            'bg-primary-600/80 hover:bg-primary-600 rounded transition-colors flex items-center justify-center',
+            size.button
+          )}
+          title="Home Position"
+        >
+          <Home className={cn('text-white', size.icon)} />
+        </button>
 
-              {/* Middle row */}
-              <button
-                onMouseDown={() => handleMouseDown('pan_left')}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className={cn(
-                  'p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-colors active:bg-white/30',
-                  activeButton === 'pan_left' && 'bg-white/30'
-                )}
-                title="Pan Left"
-              >
-                <ChevronLeft className="w-6 h-6 text-white" />
-              </button>
-              <button
-                onClick={() => handlePTZCommand('home')}
-                className="p-4 bg-primary-600/80 hover:bg-primary-600 rounded-lg transition-colors"
-                title="Home Position"
-              >
-                <Home className="w-6 h-6 text-white" />
-              </button>
-              <button
-                onMouseDown={() => handleMouseDown('pan_right')}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className={cn(
-                  'p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-colors active:bg-white/30',
-                  activeButton === 'pan_right' && 'bg-white/30'
-                )}
-                title="Pan Right"
-              >
-                <ChevronRight className="w-6 h-6 text-white" />
-              </button>
+        {/* Right */}
+        <button
+          onMouseDown={() => handleMouseDown('pan_right')}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={
+            activeButton === 'pan_right' ? activeButtonClass : buttonClass
+          }
+          title="Pan Right"
+        >
+          <ChevronRight className={cn('text-white', size.icon)} />
+        </button>
 
-              {/* Bottom row */}
-              <div />
-              <button
-                onMouseDown={() => handleMouseDown('tilt_down')}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className={cn(
-                  'p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-colors active:bg-white/30',
-                  activeButton === 'tilt_down' && 'bg-white/30'
-                )}
-                title="Tilt Down"
-              >
-                <ChevronDown className="w-6 h-6 text-white" />
-              </button>
-              <div />
-            </div>
-
-            {/* Zoom Controls */}
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <button
-                onMouseDown={() => handleMouseDown('zoom_in')}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className={cn(
-                  'p-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center justify-center gap-2 active:bg-white/30',
-                  activeButton === 'zoom_in' && 'bg-white/30'
-                )}
-                title="Zoom In"
-              >
-                <ZoomIn className="w-5 h-5 text-white" />
-                <span className="text-white text-sm">Zoom In</span>
-              </button>
-              <button
-                onMouseDown={() => handleMouseDown('zoom_out')}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className={cn(
-                  'p-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center justify-center gap-2 active:bg-white/30',
-                  activeButton === 'zoom_out' && 'bg-white/30'
-                )}
-                title="Zoom Out"
-              >
-                <ZoomOut className="w-5 h-5 text-white" />
-                <span className="text-white text-sm">Zoom Out</span>
-              </button>
-            </div>
-
-            {/* Presets */}
-            <div className="border-t border-white/20 pt-3 mt-2">
-              <div className="text-white/60 text-xs mb-2">Presets</div>
-              <div className="grid grid-cols-4 gap-2">
-                {[1, 2, 3, 4].map((preset) => (
-                  <button
-                    key={preset}
-                    onClick={() => handlePTZCommand('preset', { preset_id: preset })}
-                    className="p-2 bg-white/10 hover:bg-white/20 rounded text-white text-sm transition-colors"
-                    title={`Preset ${preset}`}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Help text */}
-            <div className="text-white/40 text-xs text-center mt-2">
-              Hold directional buttons to move camera
-            </div>
-          </div>
-        </div>
+        {/* Down */}
+        <button
+          onMouseDown={() => handleMouseDown('tilt_down')}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={
+            activeButton === 'tilt_down' ? activeButtonClass : buttonClass
+          }
+          title="Tilt Down"
+        >
+          <ChevronDown className={cn('text-white', size.icon)} />
+        </button>
       </div>
+
+      {/* Divider */}
+      <div className="h-px bg-white/10 my-1.5" />
+
+      {/* Zoom controls */}
+      <div className={cn('flex flex-col', size.gap)}>
+        <button
+          onMouseDown={() => handleMouseDown('zoom_in')}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={
+            activeButton === 'zoom_in' ? activeButtonClass : buttonClass
+          }
+          title="Zoom In"
+        >
+          <ZoomIn className={cn('text-white', size.icon)} />
+        </button>
+        <button
+          onMouseDown={() => handleMouseDown('zoom_out')}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className={
+            activeButton === 'zoom_out' ? activeButtonClass : buttonClass
+          }
+          title="Zoom Out"
+        >
+          <ZoomOut className={cn('text-white', size.icon)} />
+        </button>
+      </div>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Pin/Unpin button at bottom */}
+      <button
+        onClick={onTogglePin}
+        className={cn(
+          isPinned
+            ? 'bg-primary-600/80 hover:bg-primary-600'
+            : 'bg-white/10 hover:bg-white/20',
+          'rounded transition-colors flex items-center justify-center',
+          size.button
+        )}
+        title={isPinned ? 'Unpin Controls' : 'Pin Controls'}
+      >
+        {isPinned ? (
+          <Pin className={cn('text-white', size.icon)} />
+        ) : (
+          <PinOff className={cn('text-white', size.icon)} />
+        )}
+      </button>
     </div>
   );
 }
