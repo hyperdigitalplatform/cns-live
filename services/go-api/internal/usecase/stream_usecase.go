@@ -63,7 +63,92 @@ func (u *StreamUseCase) RequestStream(ctx context.Context, req domain.StreamRequ
 		return nil, fmt.Errorf("camera is not online: %s", camera.Status)
 	}
 
-	// 2. Check agency limit (Stream Counter)
+	// 2. Check if camera stream is already active (resource sharing)
+	existingReservation, err := u.streamRepo.GetReservationByCameraID(ctx, req.CameraID)
+	if err != nil {
+		u.logger.Warn().Err(err).Str("camera_id", req.CameraID).Msg("Failed to check existing reservation")
+	}
+
+	// If stream is already active for this camera, reuse existing resources
+	if existingReservation != nil {
+		u.logger.Info().
+			Str("camera_id", req.CameraID).
+			Str("existing_reservation_id", existingReservation.ID).
+			Str("new_user_id", req.UserID).
+			Msg("Reusing existing stream resources for additional viewer")
+
+		// Create a new reservation for quota tracking
+		reservation, err := u.streamCounterClient.ReserveStream(ctx, req.CameraID, camera.Source, req.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reserve stream slot: %w", err)
+		}
+
+		// Generate a new token for this viewer (same room, different user)
+		quality := req.Quality
+		if quality == "" {
+			quality = "medium"
+		}
+
+		roomName := fmt.Sprintf("camera_%s", req.CameraID)
+		// Use reservation ID as participant identity to ensure each viewer has unique identity
+		participantIdentity := fmt.Sprintf("viewer_%s", reservation.ReservationID)
+		token, err := u.livekitClient.GenerateToken(
+			roomName,
+			participantIdentity,
+			false, // viewers cannot publish
+			time.Hour,
+		)
+		if err != nil {
+			// Rollback reservation
+			u.streamCounterClient.ReleaseStream(ctx, reservation.ReservationID)
+			return nil, fmt.Errorf("failed to generate token: %w", err)
+		}
+
+		// Save metadata for this viewer's reservation
+		streamReservation := &domain.StreamReservation{
+			ID:            reservation.ReservationID,
+			CameraID:      req.CameraID,
+			CameraName:    camera.Name,
+			UserID:        req.UserID,
+			Source:        camera.Source,
+			RoomName:      roomName,
+			Token:         token,
+			IngressID:     existingReservation.IngressID, // Reuse existing ingress
+			ReservedAt:    time.Now(),
+			ExpiresAt:     time.Now().Add(time.Hour),
+			LastHeartbeat: time.Now(),
+		}
+
+		if err := u.streamRepo.SaveReservationMetadata(ctx, streamReservation); err != nil {
+			u.logger.Warn().Err(err).Msg("Failed to save reservation metadata")
+		}
+
+		u.logger.Info().
+			Str("reservation_id", reservation.ReservationID).
+			Str("user_id", req.UserID).
+			Str("camera_id", req.CameraID).
+			Str("reused_ingress_id", existingReservation.IngressID).
+			Msg("Additional viewer joined existing stream")
+
+		return &domain.StreamResponse{
+			ReservationID: reservation.ReservationID,
+			CameraID:      req.CameraID,
+			CameraName:    camera.Name,
+			RoomName:      roomName,
+			Token:         token,
+			LiveKitURL:    u.livekitURL,
+			ExpiresAt:     streamReservation.ExpiresAt,
+			Quality:       quality,
+		}, nil
+	}
+
+	// No existing stream - create all resources (first viewer)
+	u.logger.Info().
+		Str("camera_id", req.CameraID).
+		Str("user_id", req.UserID).
+		Msg("Creating new stream resources (first viewer)")
+
+	// 3. Check agency limit (Stream Counter)
 	reservation, err := u.streamCounterClient.ReserveStream(ctx, req.CameraID, camera.Source, req.UserID)
 	if err != nil {
 		// If reservation fails, it's likely due to limit exceeded
@@ -127,9 +212,11 @@ func (u *StreamUseCase) RequestStream(ctx context.Context, req domain.StreamRequ
 		quality = "medium"
 	}
 
+	// Use reservation ID as participant identity to ensure each viewer has unique identity
+	participantIdentity := fmt.Sprintf("viewer_%s", reservation.ReservationID)
 	token, err := u.livekitClient.GenerateToken(
 		roomName,
-		req.UserID,
+		participantIdentity,
 		false, // viewers cannot publish
 		time.Hour,
 	)
@@ -154,8 +241,10 @@ func (u *StreamUseCase) RequestStream(ctx context.Context, req domain.StreamRequ
 		LastHeartbeat: time.Now(),
 	}
 
-	if err := u.streamRepo.SaveReservation(ctx, streamReservation); err != nil {
-		u.logger.Warn().Err(err).Msg("Failed to save reservation to repository")
+	// Save go-api specific metadata (room_name, token, ingress_id, camera_name)
+	// This is stored separately from stream-counter's reservation HASH
+	if err := u.streamRepo.SaveReservationMetadata(ctx, streamReservation); err != nil {
+		u.logger.Warn().Err(err).Msg("Failed to save reservation metadata")
 		// Don't fail the request, just log the warning
 	}
 
@@ -183,11 +272,45 @@ func (u *StreamUseCase) RequestStream(ctx context.Context, req domain.StreamRequ
 
 // ReleaseStream releases a stream reservation
 func (u *StreamUseCase) ReleaseStream(ctx context.Context, reservationID string) error {
-	// Get reservation details
-	reservation, err := u.streamRepo.GetReservation(ctx, reservationID)
+	// Get reservation details from HASH (stream-counter format)
+	reservation, err := u.streamRepo.GetReservationFromHash(ctx, reservationID)
 	if err != nil {
 		return fmt.Errorf("reservation not found: %w", err)
 	}
+
+	// Release from Stream Counter FIRST (this deletes the reservation HASH)
+	if err := u.streamCounterClient.ReleaseStream(ctx, reservationID); err != nil {
+		u.logger.Error().Err(err).Msg("Failed to release stream from counter")
+		// Continue anyway
+	}
+
+	// Delete metadata for this viewer
+	if err := u.streamRepo.DeleteReservationMetadata(ctx, reservationID); err != nil {
+		u.logger.Warn().Err(err).Msg("Failed to delete reservation metadata")
+	}
+
+	// Check if there are any other viewers for this camera
+	remainingReservation, err := u.streamRepo.GetReservationByCameraID(ctx, reservation.CameraID)
+	if err != nil {
+		u.logger.Warn().Err(err).Str("camera_id", reservation.CameraID).Msg("Failed to check for remaining viewers")
+	}
+
+	// If there are still other viewers, don't delete shared resources
+	if remainingReservation != nil {
+		u.logger.Info().
+			Str("reservation_id", reservationID).
+			Str("camera_id", reservation.CameraID).
+			Str("user_id", reservation.UserID).
+			Str("remaining_reservation_id", remainingReservation.ID).
+			Msg("Viewer disconnected - stream resources kept for remaining viewers")
+		return nil
+	}
+
+	// No more viewers - clean up all physical resources
+	u.logger.Info().
+		Str("reservation_id", reservationID).
+		Str("camera_id", reservation.CameraID).
+		Msg("Last viewer disconnected - cleaning up all stream resources")
 
 	// Stop WHIP pusher container
 	pusherContainerName := fmt.Sprintf("whip-pusher-%s", reservation.CameraID)
@@ -211,26 +334,14 @@ func (u *StreamUseCase) ReleaseStream(ctx context.Context, reservationID string)
 		// Continue anyway
 	}
 
-	// Release from Stream Counter
-	if err := u.streamCounterClient.ReleaseStream(ctx, reservationID); err != nil {
-		u.logger.Error().Err(err).Msg("Failed to release stream from counter")
-		// Continue anyway
-	}
-
-	// Remove from repository
-	if err := u.streamRepo.DeleteReservation(ctx, reservationID); err != nil {
-		u.logger.Warn().Err(err).Msg("Failed to delete reservation from repository")
-	}
-
-	// Note: We don't delete the LiveKit room as other viewers might still be watching
-	// Rooms auto-cleanup after empty_timeout (60s)
+	// Note: We don't delete the LiveKit room as it will auto-cleanup after empty_timeout (60s)
 
 	u.logger.Info().
 		Str("reservation_id", reservationID).
 		Str("camera_id", reservation.CameraID).
 		Str("user_id", reservation.UserID).
 		Str("ingress_id", reservation.IngressID).
-		Msg("Stream released")
+		Msg("All stream resources cleaned up (last viewer)")
 
 	return nil
 }
@@ -298,7 +409,13 @@ func (u *StreamUseCase) GetStreamStats(ctx context.Context) (*domain.StreamStats
 		if rooms != nil {
 			for _, room := range rooms {
 				if room.Name == reservation.RoomName {
+					// Exclude the publisher from viewer count
+					// The publisher (WHIP ingress) is named like "camera_<id>_publisher"
+					// Real viewers are dashboard users
 					viewerCount = int(room.NumParticipants)
+					if viewerCount > 0 {
+						viewerCount-- // Subtract 1 for the publisher
+					}
 					break
 				}
 			}
@@ -323,10 +440,16 @@ func (u *StreamUseCase) GetStreamStats(ctx context.Context) (*domain.StreamStats
 }
 
 // countTotalViewers counts total viewers across all rooms
+// Excludes publishers (WHIP ingress) from the count
 func (u *StreamUseCase) countTotalViewers(rooms []*livekit.Room) int {
 	total := 0
 	for _, room := range rooms {
-		total += int(room.NumParticipants)
+		participants := int(room.NumParticipants)
+		// Each room has 1 publisher (WHIP ingress), subtract it from count
+		if participants > 0 {
+			participants-- // Exclude the publisher
+		}
+		total += participants
 	}
 	return total
 }

@@ -190,10 +190,10 @@ export interface CameraFolderTree extends CameraFolder {
 
 // Drag and drop types
 export interface DragItem {
-  type: 'camera' | 'folder';
-  id: string;
-  sourceFolder: string | null;
-  data: Camera | CameraFolder;
+  type: 'camera' | 'folder' | 'grid-cell';
+  id?: string;
+  sourceFolder?: string | null;
+  data: Camera | CameraFolder | number;
 }
 
 export interface DropTarget {

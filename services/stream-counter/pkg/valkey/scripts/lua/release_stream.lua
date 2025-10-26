@@ -27,6 +27,10 @@ if not source then
     return {0, 0, "Invalid reservation: missing source"}
 end
 
+-- Get data for logging BEFORE deleting reservation
+local camera_id = redis.call('HGET', reservation_key, 'camera_id') or 'unknown'
+local user_id = redis.call('HGET', reservation_key, 'user_id') or 'unknown'
+
 -- Decrement counter
 local count_key = "stream:count:" .. source
 local new_count = redis.call('DECR', count_key)
@@ -45,8 +49,6 @@ local heartbeat_key = "stream:heartbeat:" .. reservation_id
 redis.call('DEL', heartbeat_key)
 
 -- Log release (for monitoring)
-local camera_id = redis.call('HGET', reservation_key, 'camera_id') or 'unknown'
-local user_id = redis.call('HGET', reservation_key, 'user_id') or 'unknown'
 local log_key = "stream:log:release"
 redis.call('LPUSH', log_key,
     string.format('%s|%s|%s|%s', redis.call('TIME')[1], source, camera_id, user_id)

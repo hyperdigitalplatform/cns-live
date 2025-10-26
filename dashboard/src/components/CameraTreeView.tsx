@@ -37,6 +37,7 @@ interface CameraTreeViewProps {
   onCameraDragStart?: (camera: Camera, folderId: string | null) => void;
   selectedCameraId?: string | null;
   searchQuery?: string;
+  viewMode?: 'tree' | 'list';
 }
 
 export function CameraTreeView({
@@ -47,6 +48,7 @@ export function CameraTreeView({
   onCameraDragStart,
   selectedCameraId,
   searchQuery = '',
+  viewMode = 'tree',
 }: CameraTreeViewProps) {
   const {
     toggleFolderExpanded,
@@ -88,7 +90,7 @@ export function CameraTreeView({
     setSelectedFolder(folderId);
   };
 
-  const handleCameraClick = (camera: Camera, event: React.MouseEvent) => {
+  const handleCameraDoubleClick = (camera: Camera, event: React.MouseEvent) => {
     event.stopPropagation();
     onCameraSelect?.(camera);
   };
@@ -149,13 +151,13 @@ export function CameraTreeView({
 
       const dragItem: DragItem = JSON.parse(data);
 
-      if (dragItem.type === 'camera') {
+      if (dragItem.type === 'camera' && dragItem.id) {
         moveCameraBetweenFolders(
           dragItem.id,
-          dragItem.sourceFolder,
+          dragItem.sourceFolder || null,
           targetFolderId
         );
-      } else if (dragItem.type === 'folder') {
+      } else if (dragItem.type === 'folder' && dragItem.id) {
         if (dragItem.id !== targetFolderId) {
           moveFolder(dragItem.id, targetFolderId);
         }
@@ -192,9 +194,8 @@ export function CameraTreeView({
 
   const handleConfirmCreateSubfolder = () => {
     if (folderName.trim() && currentFolderId) {
-      createFolder(folderName.trim(), folderNameAr.trim() || undefined, currentFolderId);
+      createFolder(folderName.trim(), undefined, currentFolderId);
       setFolderName('');
-      setFolderNameAr('');
       setShowCreateSubfolderDialog(false);
       setCurrentFolderId(null);
     }
@@ -211,9 +212,8 @@ export function CameraTreeView({
 
   const handleConfirmRename = () => {
     if (folderName.trim() && currentFolderId) {
-      updateFolder(currentFolderId, { name: folderName.trim(), name_ar: folderNameAr.trim() || undefined });
+      updateFolder(currentFolderId, { name: folderName.trim() });
       setFolderName('');
-      setFolderNameAr('');
       setShowRenameDialog(false);
       setCurrentFolderId(null);
     }
@@ -313,7 +313,7 @@ export function CameraTreeView({
     return null;
   };
 
-  const renderCamera = (camera: Camera, folderId: string | null) => {
+  const renderCamera = (camera: Camera, folderId: string | null, depth: number = 0) => {
     const isOnline = camera.status === 'ONLINE';
     const isSelected = selectedCameraId === camera.id;
 
@@ -322,29 +322,37 @@ export function CameraTreeView({
         key={camera.id}
         draggable
         onDragStart={(e) => handleCameraDragStart(e, camera, folderId)}
-        onClick={(e) => handleCameraClick(camera, e)}
+        onDoubleClick={(e) => handleCameraDoubleClick(camera, e)}
         onContextMenu={(e) => handleContextMenu(e, 'camera', camera.id, folderId || undefined)}
         className={cn(
-          'flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors group',
+          'flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors group relative',
           isSelected
             ? 'bg-blue-100 border border-blue-500'
-            : 'hover:bg-gray-100',
-          'ml-6'
+            : 'hover:bg-gray-100'
         )}
+        style={{ paddingLeft: `${depth * 20 + 28}px` }}
       >
+        {/* Tree connector lines for cameras */}
+        {depth > 0 && (
+          <>
+            <div
+              className="absolute left-0 top-0 bottom-0 w-px bg-gray-300"
+              style={{ left: `${(depth - 1) * 20 + 18}px` }}
+            />
+            <div
+              className="absolute top-1/2 w-3 h-px bg-gray-300"
+              style={{ left: `${(depth - 1) * 20 + 18}px` }}
+            />
+          </>
+        )}
         {isOnline ? (
           <Video className="w-4 h-4 text-green-600 flex-shrink-0" />
         ) : (
           <VideoOff className="w-4 h-4 text-gray-400 flex-shrink-0" />
         )}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
-            {camera.name}
-          </p>
-          {camera.name_ar && (
-            <p className="text-xs text-gray-500 truncate">{camera.name_ar}</p>
-          )}
-        </div>
+        <span className="flex-1 text-sm font-medium text-gray-900 truncate text-left">
+          {camera.name}
+        </span>
         <span
           className={cn(
             'w-2 h-2 rounded-full flex-shrink-0',
@@ -374,13 +382,26 @@ export function CameraTreeView({
           onDrop={(e) => handleDrop(e, folder.id)}
           onContextMenu={(e) => handleContextMenu(e, 'folder', folder.id)}
           className={cn(
-            'flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors group',
+            'flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors group relative',
             isSelected && 'bg-blue-50',
             isDraggedOver && 'bg-blue-100 ring-2 ring-blue-500',
             'hover:bg-gray-100'
           )}
-          style={{ paddingLeft: `${folder.depth * 12 + 8}px` }}
+          style={{ paddingLeft: `${folder.depth * 20 + 8}px` }}
         >
+          {/* Tree connector lines */}
+          {folder.depth > 0 && (
+            <>
+              <div
+                className="absolute left-0 top-0 bottom-0 w-px bg-gray-300"
+                style={{ left: `${(folder.depth - 1) * 20 + 18}px` }}
+              />
+              <div
+                className="absolute top-1/2 w-3 h-px bg-gray-300"
+                style={{ left: `${(folder.depth - 1) * 20 + 18}px` }}
+              />
+            </>
+          )}
           <button
             onClick={() => handleFolderClick(folder.id)}
             className="flex items-center gap-1 flex-1 min-w-0"
@@ -410,16 +431,9 @@ export function CameraTreeView({
                 className="flex-1 px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             ) : (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {filteredFolder.name}
-                </p>
-                {filteredFolder.name_ar && (
-                  <p className="text-xs text-gray-500 truncate">
-                    {filteredFolder.name_ar}
-                  </p>
-                )}
-              </div>
+              <span className="text-sm font-medium text-gray-900 truncate text-left">
+                {filteredFolder.name}
+              </span>
             )}
           </button>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -442,7 +456,7 @@ export function CameraTreeView({
         {isExpanded && (
           <div className="mt-1 space-y-0.5">
             {filteredFolder.cameras.map((camera) =>
-              renderCamera(camera, folder.id)
+              renderCamera(camera, folder.id, folder.depth + 1)
             )}
             {filteredFolder.children.map((child) => renderFolder(child))}
           </div>
@@ -464,24 +478,35 @@ export function CameraTreeView({
     <div className="space-y-1">
       {folderTrees.map((tree) => renderFolder(tree))}
 
-      {/* Unorganized cameras section */}
-      <div
-        className={cn(
-          "mt-4 pt-4 border-t border-gray-200",
-          dragOver === 'unorganized' && 'bg-blue-50 border-blue-300 rounded-lg'
-        )}
-        onDragOver={(e) => handleDragOver(e, 'unorganized')}
-        onDragLeave={handleDragLeave}
-        onDrop={(e) => handleDrop(e, null)}
-      >
-        <div className="px-2 py-2 text-sm font-medium text-gray-500 flex items-center gap-2">
-          <Folder className="w-4 h-4" />
-          Unorganized ({unorganizedCameras.length})
+      {/* Unorganized cameras section - Now part of tree */}
+      {unorganizedCameras.length > 0 && (
+        <div
+          className={cn(
+            dragOver === 'unorganized' && 'bg-blue-50 ring-2 ring-blue-500'
+          )}
+          onDragOver={(e) => handleDragOver(e, 'unorganized')}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, null)}
+        >
+          <div className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-gray-100 cursor-pointer transition-colors group"
+            style={{ paddingLeft: '8px' }}
+          >
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 invisible" />
+            <Folder className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <span className="text-sm font-medium text-gray-600 truncate text-left">
+              Unorganized
+            </span>
+            <div className="flex items-center gap-1 opacity-100 transition-opacity ml-auto">
+              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                {unorganizedCameras.length}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-0.5">
+            {unorganizedCameras.map((camera) => renderCamera(camera, null, 1))}
+          </div>
         </div>
-        <div className="space-y-0.5">
-          {unorganizedCameras.map((camera) => renderCamera(camera, null))}
-        </div>
-      </div>
+      )}
 
       {/* Context menu */}
       {contextMenu && (
@@ -577,24 +602,11 @@ export function CameraTreeView({
           <DialogBody>
             <div className="space-y-4">
               <Input
-                label="Subfolder Name (English)"
+                label="Subfolder Name"
                 placeholder="e.g., Highway Cameras"
                 value={folderName}
                 onChange={(e) => setFolderName(e.target.value)}
                 autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && folderName.trim()) {
-                    handleConfirmCreateSubfolder();
-                  }
-                }}
-              />
-
-              <Input
-                label="Subfolder Name (Arabic) - Optional"
-                placeholder="مثال: كاميرات الطريق السريع"
-                value={folderNameAr}
-                onChange={(e) => setFolderNameAr(e.target.value)}
-                dir="rtl"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && folderName.trim()) {
                     handleConfirmCreateSubfolder();
@@ -610,7 +622,6 @@ export function CameraTreeView({
               onClick={() => {
                 setShowCreateSubfolderDialog(false);
                 setFolderName('');
-                setFolderNameAr('');
               }}
             >
               Cancel
@@ -639,24 +650,11 @@ export function CameraTreeView({
           <DialogBody>
             <div className="space-y-4">
               <Input
-                label="Folder Name (English)"
+                label="Folder Name"
                 placeholder="e.g., Traffic Cameras"
                 value={folderName}
                 onChange={(e) => setFolderName(e.target.value)}
                 autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && folderName.trim()) {
-                    handleConfirmRename();
-                  }
-                }}
-              />
-
-              <Input
-                label="Folder Name (Arabic) - Optional"
-                placeholder="مثال: كاميرات المرور"
-                value={folderNameAr}
-                onChange={(e) => setFolderNameAr(e.target.value)}
-                dir="rtl"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && folderName.trim()) {
                     handleConfirmRename();
@@ -672,7 +670,6 @@ export function CameraTreeView({
               onClick={() => {
                 setShowRenameDialog(false);
                 setFolderName('');
-                setFolderNameAr('');
               }}
             >
               Cancel

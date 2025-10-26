@@ -1,61 +1,141 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef, useImperativeHandle } from 'react';
 import { LiveStreamPlayer } from './LiveStreamPlayer';
 import type { Camera, DragItem } from '@/types';
 import { Grid, Maximize2, X, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+
+export interface StreamGridEnhancedRef {
+  addCameraToNextAvailableCell: (camera: Camera) => boolean;
+}
 
 interface StreamGridEnhancedProps {
   defaultLayout?: GridLayoutType;
   onLayoutChange?: (layout: GridLayoutType) => void;
 }
 
-type GridLayoutType = '1x1' | '2x2' | '3x3' | '4x4' | '2x3' | '3x4' | '4x5' | '5x5' | '6x6';
+type GridLayoutType =
+  | '2x2' | '2x3' | '3x3' | '3x4'
+  | '9-way-1-hotspot' | '12-way-1-hotspot' | '16-way-1-hotspot'
+  | '25-way-1-hotspot' | '64-way-1-hotspot';
 
-const GRID_LAYOUTS: Record<
-  GridLayoutType,
-  { cols: number; rows: number; label: string }
-> = {
-  '1x1': { cols: 1, rows: 1, label: '1×1' },
-  '2x2': { cols: 2, rows: 2, label: '2×2' },
-  '3x3': { cols: 3, rows: 3, label: '3×3' },
-  '4x4': { cols: 4, rows: 4, label: '4×4' },
-  '2x3': { cols: 2, rows: 3, label: '2×3' },
-  '3x4': { cols: 3, rows: 4, label: '3×4' },
-  '4x5': { cols: 4, rows: 5, label: '4×5' },
-  '5x5': { cols: 5, rows: 5, label: '5×5' },
-  '6x6': { cols: 6, rows: 6, label: '6×6' },
+interface GridLayout {
+  cols: number;
+  rows: number;
+  label: string;
+  isHotspot?: boolean;
+  hotspotCols?: number;
+  hotspotRows?: number;
+  totalCameras?: number;
+}
+
+const GRID_LAYOUTS: Record<GridLayoutType, GridLayout> = {
+  // Standard layouts
+  '2x2': { cols: 2, rows: 2, label: '2×2', totalCameras: 4 },
+  '2x3': { cols: 2, rows: 3, label: '2×3', totalCameras: 6 },
+  '3x3': { cols: 3, rows: 3, label: '3×3', totalCameras: 9 },
+  '3x4': { cols: 3, rows: 4, label: '3×4', totalCameras: 12 },
+
+  // Hotspot layouts
+  '9-way-1-hotspot': {
+    cols: 3, rows: 3, label: '9-Way-1-Hotspot',
+    isHotspot: true, hotspotCols: 2, hotspotRows: 2, totalCameras: 6
+  },
+  '12-way-1-hotspot': {
+    cols: 3, rows: 4, label: '12-Way-1-Hotspot',
+    isHotspot: true, hotspotCols: 2, hotspotRows: 3, totalCameras: 7
+  },
+  '16-way-1-hotspot': {
+    cols: 4, rows: 4, label: '16-Way-1-Hotspot',
+    isHotspot: true, hotspotCols: 3, hotspotRows: 3, totalCameras: 8
+  },
+  '25-way-1-hotspot': {
+    cols: 5, rows: 5, label: '25-Way-1-Hotspot',
+    isHotspot: true, hotspotCols: 4, hotspotRows: 4, totalCameras: 10
+  },
+  '64-way-1-hotspot': {
+    cols: 8, rows: 8, label: '64-Way-1-Hotspot',
+    isHotspot: true, hotspotCols: 7, hotspotRows: 7, totalCameras: 16
+  },
 };
 
 interface GridCell {
   camera: Camera | null;
   loading: boolean;
+  isHotspot?: boolean;
+  gridArea?: string;
 }
 
-export function StreamGridEnhanced({
-  defaultLayout = '3x3',
-  onLayoutChange,
-}: StreamGridEnhancedProps) {
-  const [layout, setLayout] = useState<GridLayoutType>(defaultLayout);
-  const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+// Helper function to build grid cell structure for hotspot layouts
+function buildHotspotCells(layoutConfig: GridLayout): GridCell[] {
+  const { cols, rows, isHotspot, hotspotCols, hotspotRows, totalCameras } = layoutConfig;
 
-  const { cols, rows } = GRID_LAYOUTS[layout];
-  const maxCells = cols * rows;
+  if (!isHotspot || !hotspotCols || !hotspotRows || !totalCameras) {
+    // Standard layout - simple grid
+    return Array.from({ length: cols * rows }, () => ({
+      camera: null,
+      loading: false
+    }));
+  }
 
-  // Initialize grid cells
-  const [gridCells, setGridCells] = useState<GridCell[]>(
-    Array.from({ length: maxCells }, () => ({ camera: null, loading: false }))
-  );
+  // Hotspot layout
+  const cells: GridCell[] = [];
+
+  // Cell 0: Hotspot (spans hotspotCols × hotspotRows)
+  cells.push({
+    camera: null,
+    loading: false,
+    isHotspot: true,
+    gridArea: `1 / 1 / ${hotspotRows + 1} / ${hotspotCols + 1}`
+  });
+
+  // Right column cells (rows 1 to hotspotRows)
+  for (let row = 1; row <= hotspotRows; row++) {
+    cells.push({
+      camera: null,
+      loading: false,
+      gridArea: `${row} / ${cols} / ${row + 1} / ${cols + 1}`
+    });
+  }
+
+  // Bottom row cells (all columns)
+  for (let col = 1; col <= cols; col++) {
+    cells.push({
+      camera: null,
+      loading: false,
+      gridArea: `${rows} / ${col} / ${rows + 1} / ${col + 1}`
+    });
+  }
+
+  return cells.slice(0, totalCameras);
+}
+
+export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEnhancedProps>(
+  function StreamGridEnhanced({ defaultLayout = '3x3', onLayoutChange }, ref) {
+    const [layout, setLayout] = useState<GridLayoutType>(defaultLayout);
+    const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+    const layoutConfig = GRID_LAYOUTS[layout];
+    const { cols, rows, isHotspot, totalCameras } = layoutConfig;
+    const maxCells = totalCameras || cols * rows;
+
+    // Initialize grid cells
+    const [gridCells, setGridCells] = useState<GridCell[]>(
+      buildHotspotCells(layoutConfig)
+    );
 
   // Update grid cells when layout changes
   React.useEffect(() => {
     setGridCells((prev) => {
-      const newCells = Array.from({ length: maxCells }, (_, index) =>
-        prev[index] || { camera: null, loading: false }
-      );
-      return newCells;
+      const newCells = buildHotspotCells(layoutConfig);
+      // Preserve existing camera assignments where possible
+      return newCells.map((cell, index) => ({
+        ...cell,
+        camera: prev[index]?.camera || null,
+        loading: prev[index]?.loading || false,
+      }));
     });
-  }, [maxCells]);
+  }, [layout]);
 
   const handleLayoutChange = (newLayout: GridLayoutType) => {
     setLayout(newLayout);
@@ -88,6 +168,10 @@ export function StreamGridEnhanced({
       if (dragItem.type === 'camera') {
         const camera = dragItem.data as Camera;
         assignCameraToCell(camera, index);
+      } else if (dragItem.type === 'grid-cell') {
+        // Handle drag between cells
+        const sourceCellIndex = dragItem.data as number;
+        swapCells(sourceCellIndex, index);
       }
     } catch (error) {
       console.error('Drop failed:', error);
@@ -97,23 +181,84 @@ export function StreamGridEnhanced({
   const assignCameraToCell = (camera: Camera, index: number) => {
     setGridCells((prev) => {
       const newCells = [...prev];
-      newCells[index] = { camera, loading: false };
+      // Preserve isHotspot and gridArea properties
+      newCells[index] = {
+        ...newCells[index],
+        camera,
+        loading: false
+      };
       return newCells;
     });
   };
+
+  const addCameraToNextAvailableCell = (camera: Camera): boolean => {
+    const firstEmptyIndex = gridCells.findIndex((cell) => cell.camera === null);
+    if (firstEmptyIndex === -1) {
+      return false; // Grid is full
+    }
+    assignCameraToCell(camera, firstEmptyIndex);
+    return true;
+  };
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    addCameraToNextAvailableCell,
+  }));
 
   const removeCameraFromCell = (index: number) => {
     setGridCells((prev) => {
       const newCells = [...prev];
-      newCells[index] = { camera: null, loading: false };
+      // Preserve isHotspot and gridArea properties
+      newCells[index] = {
+        ...newCells[index],
+        camera: null,
+        loading: false
+      };
       return newCells;
     });
   };
 
+  const swapCells = (sourceIndex: number, targetIndex: number) => {
+    if (sourceIndex === targetIndex) return;
+
+    setGridCells((prev) => {
+      const newCells = [...prev];
+      const sourceCamera = newCells[sourceIndex].camera;
+      const targetCamera = newCells[targetIndex].camera;
+
+      // Swap cameras while preserving grid structure properties
+      newCells[sourceIndex] = {
+        ...newCells[sourceIndex],
+        camera: targetCamera,
+        loading: false
+      };
+      newCells[targetIndex] = {
+        ...newCells[targetIndex],
+        camera: sourceCamera,
+        loading: false
+      };
+
+      return newCells;
+    });
+  };
+
+  const handleCellDragStart = (event: React.DragEvent, index: number) => {
+    const dragData: DragItem = {
+      type: 'grid-cell',
+      data: index
+    };
+    event.dataTransfer.setData('application/json', JSON.stringify(dragData));
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
   const clearAllCells = () => {
     if (confirm('Clear all cameras from grid?')) {
-      setGridCells(
-        Array.from({ length: maxCells }, () => ({ camera: null, loading: false }))
+      setGridCells((prev) =>
+        prev.map((cell) => ({
+          ...cell,
+          camera: null,
+          loading: false
+        }))
       );
     }
   };
@@ -142,27 +287,58 @@ export function StreamGridEnhanced({
     <div className="flex flex-col h-full bg-gray-100">
       {/* Toolbar */}
       <div className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
+        <div className="flex items-start gap-4 flex-wrap">
+          <div className="flex items-center gap-2 pt-6">
             <Grid className="w-5 h-5 text-gray-600" />
             <span className="font-medium text-gray-700">Layout:</span>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {(Object.keys(GRID_LAYOUTS) as GridLayoutType[]).map((key) => (
-              <button
-                key={key}
-                onClick={() => handleLayoutChange(key)}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                  layout === key
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                )}
-              >
-                {GRID_LAYOUTS[key].label}
-              </button>
-            ))}
+
+          {/* Standard Layouts */}
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500 font-medium">Standard</span>
+            <div className="flex gap-2 flex-wrap">
+              {(Object.keys(GRID_LAYOUTS) as GridLayoutType[])
+                .filter((key) => !GRID_LAYOUTS[key].isHotspot)
+                .map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => handleLayoutChange(key)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                      layout === key
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    )}
+                  >
+                    {GRID_LAYOUTS[key].label}
+                  </button>
+                ))}
+            </div>
           </div>
+
+          {/* Hotspot Layouts */}
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500 font-medium">Hotspot</span>
+            <div className="flex gap-2 flex-wrap">
+              {(Object.keys(GRID_LAYOUTS) as GridLayoutType[])
+                .filter((key) => GRID_LAYOUTS[key].isHotspot)
+                .map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => handleLayoutChange(key)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border',
+                      layout === key
+                        ? 'bg-amber-500 text-white shadow-sm border-amber-600'
+                        : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border-amber-200'
+                    )}
+                  >
+                    {GRID_LAYOUTS[key].label}
+                  </button>
+                ))}
+            </div>
+          </div>
+
           <div className="ml-auto flex items-center gap-4">
             <div className="text-sm text-gray-600">
               <span className="font-semibold text-gray-900">{activeCameras}</span> /{' '}
@@ -193,15 +369,19 @@ export function StreamGridEnhanced({
           {gridCells.map((cell, index) => (
             <div
               key={index}
+              draggable={!!cell.camera}
+              onDragStart={(e) => cell.camera && handleCellDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, index)}
+              style={cell.gridArea ? { gridArea: cell.gridArea } : undefined}
               className={cn(
                 'relative rounded-lg overflow-hidden shadow-md group transition-all',
                 cell.camera
-                  ? 'bg-gray-900'
+                  ? 'bg-gray-900 cursor-move'
                   : 'bg-gray-200 border-2 border-dashed border-gray-300',
-                dragOverIndex === index && 'ring-4 ring-blue-500 ring-opacity-50 scale-105'
+                dragOverIndex === index && 'ring-4 ring-blue-500 ring-opacity-50 scale-105',
+                cell.isHotspot && 'ring-2 ring-amber-500'
               )}
             >
               {cell.camera ? (
@@ -241,19 +421,34 @@ export function StreamGridEnhanced({
 
                   {/* Cell number badge */}
                   <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                    Cell {index + 1}
+                    {cell.isHotspot ? 'Hotspot' : `Cell ${index + 1}`}
                   </div>
+
+                  {/* Hotspot indicator */}
+                  {cell.isHotspot && (
+                    <div className="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-md font-semibold shadow-lg">
+                      HOTSPOT
+                    </div>
+                  )}
                 </>
               ) : (
                 /* Empty cell placeholder */
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-4">
+                  {cell.isHotspot && (
+                    <div className="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-md font-semibold shadow-lg">
+                      HOTSPOT
+                    </div>
+                  )}
                   <div className="text-center">
-                    <Plus className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                    <Plus className={cn(
+                      "mx-auto mb-2 opacity-40",
+                      cell.isHotspot ? "w-16 h-16" : "w-10 h-10"
+                    )} />
                     <p className="text-sm font-medium">Drop camera here</p>
                     <p className="text-xs mt-1 opacity-70">or double-click in sidebar</p>
                   </div>
                   <div className="mt-4 text-xs bg-white/50 px-3 py-1 rounded-full">
-                    Cell {index + 1}
+                    {cell.isHotspot ? 'Hotspot' : `Cell ${index + 1}`}
                   </div>
                 </div>
               )}
@@ -290,4 +485,4 @@ export function StreamGridEnhanced({
       )}
     </div>
   );
-}
+});

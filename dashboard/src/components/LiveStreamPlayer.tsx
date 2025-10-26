@@ -11,6 +11,9 @@ import { useStreamStore } from '@/stores/streamStore';
 import { PTZControls } from './PTZControls';
 import { Loader2, AlertCircle } from 'lucide-react';
 
+// Module-level map to track reservations in progress (persists across React.StrictMode remounts)
+const pendingReservations = new Map<string, Promise<StreamReservation>>();
+
 interface LiveStreamPlayerProps {
   camera: Camera;
   quality?: 'high' | 'medium' | 'low';
@@ -34,12 +37,30 @@ export function LiveStreamPlayer({
 
   useEffect(() => {
     let mounted = true;
+    let currentReservationId: string | null = null;
 
     const initStream = async () => {
+      const cameraKey = `${camera.id}-${quality}`;
+
+      // Check if there's already a pending reservation for this camera
+      let pendingPromise = pendingReservations.get(cameraKey);
+
+      if (!pendingPromise) {
+        // Create new reservation promise
+        pendingPromise = reserveStream(camera.id, quality);
+        pendingReservations.set(cameraKey, pendingPromise);
+
+        // Clean up the pending promise after it completes (success or failure)
+        pendingPromise.finally(() => {
+          pendingReservations.delete(cameraKey);
+        });
+      }
+
       try {
         setLoading(true);
-        const res = await reserveStream(camera.id, quality);
+        const res = await pendingPromise;
         if (mounted) {
+          currentReservationId = res.reservation_id;
           setReservation(res);
           setLoading(false);
         }
@@ -60,12 +81,13 @@ export function LiveStreamPlayer({
 
     return () => {
       mounted = false;
-      if (reservation) {
-        releaseStream(reservation.reservation_id);
+      // Release stream on cleanup using the captured reservation ID
+      if (currentReservationId) {
+        releaseStream(currentReservationId);
       }
     };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera.id, quality]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full bg-gray-900">
