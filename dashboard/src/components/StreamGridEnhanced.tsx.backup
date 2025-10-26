@@ -270,10 +270,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
     return (
       <div className="fixed inset-0 z-50 bg-black">
         <div className="relative h-full">
-          <LiveStreamPlayer
-            key={gridCells[fullscreenIndex].camera!.id}
-            camera={gridCells[fullscreenIndex].camera!}
-          />
+          <LiveStreamPlayer camera={gridCells[fullscreenIndex].camera!} />
           <button
             onClick={() => setFullscreenIndex(null)}
             className="absolute top-4 right-4 p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg transition-colors z-10"
@@ -371,7 +368,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
         >
           {gridCells.map((cell, index) => (
             <div
-              key={cell.camera?.id || `empty-${index}`}
+              key={index}
               draggable={!!cell.camera}
               onDragStart={(e) => cell.camera && handleCellDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
@@ -390,11 +387,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
               {cell.camera ? (
                 <>
                   {/* Camera stream */}
-                  <LiveStreamPlayer
-                    key={cell.camera.id}
-                    camera={cell.camera}
-                    quality="medium"
-                  />
+                  <LiveStreamPlayer camera={cell.camera} quality="medium" />
 
                   {/* Camera info overlay */}
                   <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
