@@ -1,8 +1,12 @@
 import React, { useState, forwardRef, useImperativeHandle } from 'react';
 import { LiveStreamPlayer } from './LiveStreamPlayer';
-import type { Camera, DragItem } from '@/types';
-import { Grid, Maximize2, X, Plus, Trash2 } from 'lucide-react';
+import { SaveLayoutDialog } from './SaveLayoutDialog';
+import { LoadLayoutDropdown } from './LoadLayoutDropdown';
+import { LayoutManagerDialog } from './LayoutManagerDialog';
+import type { Camera, DragItem, LayoutType, LayoutPreferenceSummary } from '@/types';
+import { Grid, Maximize2, X, Plus, Trash2, Save, Settings } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { api } from '@/services/api';
 
 export interface StreamGridEnhancedRef {
   addCameraToNextAvailableCell: (camera: Camera) => boolean;
@@ -114,6 +118,8 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
     const [layout, setLayout] = useState<GridLayoutType>(defaultLayout);
     const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+    const [showSaveDialog, setShowSaveDialog] = useState(false);
+    const [showManageDialog, setShowManageDialog] = useState(false);
 
     const layoutConfig = GRID_LAYOUTS[layout];
     const { cols, rows, isHotspot, totalCameras } = layoutConfig;
@@ -265,6 +271,114 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
 
   const activeCameras = gridCells.filter((cell) => cell.camera !== null).length;
 
+  // Layout preference helpers
+  const getCurrentLayoutType = (): LayoutType => {
+    return isHotspot ? 'hotspot' : 'standard';
+  };
+
+  const getCurrentCameraAssignments = () => {
+    return gridCells
+      .map((cell, index) => ({
+        camera_id: cell.camera?.id || '',
+        position_index: index,
+      }))
+      .filter((assignment) => assignment.camera_id !== '');
+  };
+
+  const detectGridLayout = (layoutType: LayoutType, cameraCount: number, maxPositionIndex: number): GridLayoutType => {
+    const totalCells = maxPositionIndex + 1;
+
+    if (layoutType === 'hotspot') {
+      // Hotspot layouts - match by camera count
+      if (cameraCount <= 6 && totalCells <= 9) return '9-way-1-hotspot';
+      if (cameraCount <= 7 && totalCells <= 12) return '12-way-1-hotspot';
+      if (cameraCount <= 8 && totalCells <= 16) return '16-way-1-hotspot';
+      if (cameraCount <= 10 && totalCells <= 25) return '25-way-1-hotspot';
+      if (cameraCount <= 16 && totalCells <= 64) return '64-way-1-hotspot';
+      return '9-way-1-hotspot'; // Default hotspot
+    } else {
+      // Standard layouts - match by total cells needed
+      if (totalCells <= 4) return '2x2';
+      if (totalCells <= 6) return '2x3';
+      if (totalCells <= 9) return '3x3';
+      if (totalCells <= 12) return '3x4';
+      return '3x4'; // Default standard
+    }
+  };
+
+  const handleLoadLayout = async (layoutSummary: LayoutPreferenceSummary) => {
+    try {
+      // Fetch full layout details
+      const fullLayout = await api.getLayout(layoutSummary.id);
+
+      if (!fullLayout.cameras || fullLayout.cameras.length === 0) {
+        alert('This layout has no cameras saved.');
+        return;
+      }
+
+      // Use the saved grid_layout directly
+      const savedGridLayout = fullLayout.grid_layout as GridLayoutType;
+
+      // Switch to the saved grid layout
+      if (layout !== savedGridLayout) {
+        handleLayoutChange(savedGridLayout);
+        // Wait a bit for the layout to change
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Clear current grid
+      setGridCells((prev) =>
+        prev.map((cell) => ({
+          ...cell,
+          camera: null,
+          loading: false,
+        }))
+      );
+
+      // Set loading state for cells that will receive cameras
+      setGridCells((prev) => {
+        const newCells = [...prev];
+        fullLayout.cameras?.forEach((assignment) => {
+          if (assignment.position_index < newCells.length) {
+            newCells[assignment.position_index] = {
+              ...newCells[assignment.position_index],
+              loading: true,
+            };
+          }
+        });
+        return newCells;
+      });
+
+      // Fetch and assign each camera
+      for (const assignment of fullLayout.cameras) {
+        try {
+          // Fetch full camera details by ID
+          const camera = await api.getCamera(assignment.camera_id);
+
+          // Assign camera to the correct position in the grid
+          assignCameraToCell(camera, assignment.position_index);
+        } catch (error) {
+          console.error(`Failed to load camera ${assignment.camera_id}:`, error);
+          // Clear loading state for this cell
+          setGridCells((prev) => {
+            const newCells = [...prev];
+            if (assignment.position_index < newCells.length) {
+              newCells[assignment.position_index] = {
+                ...newCells[assignment.position_index],
+                loading: false,
+              };
+            }
+            return newCells;
+          });
+          // Continue loading other cameras even if one fails
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load layout:', error);
+      alert('Failed to load layout. Please try again.');
+    }
+  };
+
   // Fullscreen view
   if (fullscreenIndex !== null && gridCells[fullscreenIndex]?.camera) {
     return (
@@ -342,11 +456,44 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
             </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-3">
             <div className="text-sm text-gray-600">
               <span className="font-semibold text-gray-900">{activeCameras}</span> /{' '}
               {maxCells} cells
             </div>
+
+            {/* Layout Management Buttons */}
+            <div className="flex items-center gap-2 border-l border-gray-300 pl-3">
+              <LoadLayoutDropdown
+                onLayoutSelect={handleLoadLayout}
+                currentLayoutType={getCurrentLayoutType()}
+              />
+
+              <button
+                onClick={() => setShowSaveDialog(true)}
+                disabled={activeCameras === 0}
+                className={cn(
+                  'inline-flex items-center gap-2 px-3 h-10 rounded-md border text-sm font-medium transition-colors',
+                  activeCameras > 0
+                    ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
+                    : 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                )}
+                title={activeCameras === 0 ? 'Add cameras to save layout' : 'Save current layout'}
+              >
+                <Save className="w-4 h-4" />
+                Save Layout
+              </button>
+
+              <button
+                onClick={() => setShowManageDialog(true)}
+                className="inline-flex items-center gap-2 px-3 h-10 rounded-md border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+                title="Manage saved layouts"
+              >
+                <Settings className="w-4 h-4" />
+                Manage
+              </button>
+            </div>
+
             {activeCameras > 0 && (
               <button
                 onClick={clearAllCells}
@@ -490,6 +637,28 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
           </div>
         </div>
       )}
+
+      {/* Layout Dialogs */}
+      <SaveLayoutDialog
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
+        layoutType={getCurrentLayoutType()}
+        gridLayout={layout}
+        cameras={getCurrentCameraAssignments()}
+        onSuccess={() => {
+          // Optionally reload or show success message
+          console.log('Layout saved successfully');
+        }}
+      />
+
+      <LayoutManagerDialog
+        open={showManageDialog}
+        onOpenChange={setShowManageDialog}
+        onLayoutUpdate={() => {
+          // Optionally refresh something
+          console.log('Layout updated');
+        }}
+      />
     </div>
   );
 });

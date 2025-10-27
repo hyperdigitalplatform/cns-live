@@ -28,26 +28,38 @@ export function PTZControls({
   cellSize = 'medium',
 }: PTZControlsProps) {
   const [activeButton, setActiveButton] = useState<string | null>(null);
+  const [isCommandPending, setIsCommandPending] = useState(false);
 
   const handlePTZCommand = async (
     command: string,
     params?: { speed?: number; preset_id?: number }
   ) => {
+    setIsCommandPending(true);
     try {
       await api.controlPTZ(camera.id, command, params);
     } catch (error) {
       console.error('PTZ command failed:', error);
+    } finally {
+      setIsCommandPending(false);
     }
   };
 
   const handleMouseDown = (command: string) => {
+    if (isCommandPending) return; // Prevent new commands while one is pending
     setActiveButton(command);
     handlePTZCommand(command, { speed: 0.5 });
   };
 
   const handleMouseUp = () => {
+    // STOP commands should always be allowed, even when pending
+    // Send STOP command if a button was active
+    if (activeButton) {
+      // Don't use handlePTZCommand for STOP to avoid setting isCommandPending again
+      api.controlPTZ(camera.id, 'stop', { speed: 0 }).catch((error) => {
+        console.error('PTZ stop command failed:', error);
+      });
+    }
     setActiveButton(null);
-    // Send stop command if needed
   };
 
   if (!camera.ptz_enabled) {
@@ -89,7 +101,10 @@ export function PTZControls({
   const size = sizeClasses[cellSize];
 
   const buttonClass = cn(
-    'bg-white/10 hover:bg-white/20 rounded transition-colors active:bg-white/30 flex items-center justify-center',
+    'bg-white/10 rounded transition-colors flex items-center justify-center',
+    isCommandPending
+      ? 'opacity-50 cursor-not-allowed'
+      : 'hover:bg-white/20 active:bg-white/30 cursor-pointer',
     size.button
   );
 
@@ -111,6 +126,7 @@ export function PTZControls({
           onMouseDown={() => handleMouseDown('tilt_up')}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          disabled={isCommandPending}
           className={
             activeButton === 'tilt_up' ? activeButtonClass : buttonClass
           }
@@ -124,6 +140,7 @@ export function PTZControls({
           onMouseDown={() => handleMouseDown('pan_left')}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          disabled={isCommandPending}
           className={
             activeButton === 'pan_left' ? activeButtonClass : buttonClass
           }
@@ -134,9 +151,13 @@ export function PTZControls({
 
         {/* Home */}
         <button
-          onClick={() => handlePTZCommand('home')}
+          onClick={() => !isCommandPending && handlePTZCommand('home')}
+          disabled={isCommandPending}
           className={cn(
-            'bg-primary-600/80 hover:bg-primary-600 rounded transition-colors flex items-center justify-center',
+            'bg-primary-600/80 rounded transition-colors flex items-center justify-center',
+            isCommandPending
+              ? 'opacity-50 cursor-not-allowed'
+              : 'hover:bg-primary-600 cursor-pointer',
             size.button
           )}
           title="Home Position"
@@ -149,6 +170,7 @@ export function PTZControls({
           onMouseDown={() => handleMouseDown('pan_right')}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          disabled={isCommandPending}
           className={
             activeButton === 'pan_right' ? activeButtonClass : buttonClass
           }
@@ -162,6 +184,7 @@ export function PTZControls({
           onMouseDown={() => handleMouseDown('tilt_down')}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          disabled={isCommandPending}
           className={
             activeButton === 'tilt_down' ? activeButtonClass : buttonClass
           }
@@ -180,6 +203,7 @@ export function PTZControls({
           onMouseDown={() => handleMouseDown('zoom_in')}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          disabled={isCommandPending}
           className={
             activeButton === 'zoom_in' ? activeButtonClass : buttonClass
           }
@@ -191,6 +215,7 @@ export function PTZControls({
           onMouseDown={() => handleMouseDown('zoom_out')}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          disabled={isCommandPending}
           className={
             activeButton === 'zoom_out' ? activeButtonClass : buttonClass
           }

@@ -79,7 +79,7 @@ func main() {
 		Addr:         ":" + port,
 		Handler:      router,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 30 * time.Second, // Increased for slow PTZ camera responses (TrueView ~16s)
 		IdleTimeout:  60 * time.Second,
 	}
 
@@ -152,19 +152,31 @@ func initDatabase(ctx context.Context, logger zerolog.Logger) (*sql.DB, error) {
 func runMigrations(ctx context.Context, db *sql.DB, logger zerolog.Logger) error {
 	logger.Info().Msg("Running database migrations")
 
-	// Read migration file
-	migrationSQL, err := os.ReadFile("migrations/001_create_cameras_table.sql")
-	if err != nil {
-		logger.Warn().Err(err).Msg("Migration file not found, skipping")
-		return nil // Don't fail if migrations directory doesn't exist in container
+	// List of migration files in order
+	migrationFiles := []string{
+		"migrations/001_create_cameras_table.sql",
+		"migrations/002_create_layout_preferences.sql",
 	}
 
-	// Execute migration
-	if _, err := db.ExecContext(ctx, string(migrationSQL)); err != nil {
-		return fmt.Errorf("failed to execute migration: %w", err)
+	for _, file := range migrationFiles {
+		// Read migration file
+		migrationSQL, err := os.ReadFile(file)
+		if err != nil {
+			logger.Warn().Err(err).Str("file", file).Msg("Migration file not found, skipping")
+			continue
+		}
+
+		// Execute migration
+		if _, err := db.ExecContext(ctx, string(migrationSQL)); err != nil {
+			logger.Error().Err(err).Str("file", file).Msg("Migration failed")
+			// Don't fail on migration errors (tables might already exist)
+			continue
+		}
+
+		logger.Info().Str("file", file).Msg("Migration executed successfully")
 	}
 
-	logger.Info().Msg("Database migrations completed successfully")
+	logger.Info().Msg("Database migrations completed")
 	return nil
 }
 

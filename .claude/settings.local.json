@@ -60,7 +60,9 @@
       "Bash(wargs -r -I {} sh -c 'echo \"\"\"\"=== {} ===\"\"\"\"; docker exec cctv-valkey valkey-cli HGETALL {}')",
       "Bash(docker image prune:*)",
       "Bash(docker system:*)",
-      "Bash(docker builder prune:*)"
+      "Bash(docker builder prune:*)",
+      "Bash(docker cp:*)",
+      "Bash(docker rmi:*)"
     ],
     "deny": [],
     "ask": []

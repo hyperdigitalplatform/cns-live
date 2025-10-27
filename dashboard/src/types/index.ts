@@ -126,6 +126,67 @@ export interface GridCell {
   span_rows?: number;
 }
 
+// Layout Preference types
+export type LayoutType = 'standard' | 'hotspot';
+export type LayoutScope = 'global' | 'local';
+
+export interface LayoutCameraAssignment {
+  id?: string;
+  layout_id?: string;
+  camera_id: string;
+  position_index: number;
+  cell_size?: string;
+  created_at?: string;
+}
+
+export interface LayoutPreference {
+  id: string;
+  name: string;
+  description?: string;
+  layout_type: LayoutType;
+  grid_layout: string; // "2x2", "3x3", "9-way-1-hotspot", etc.
+  scope: LayoutScope;
+  created_by: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  cameras?: LayoutCameraAssignment[];
+}
+
+export interface LayoutPreferenceSummary {
+  id: string;
+  name: string;
+  description?: string;
+  layout_type: LayoutType;
+  grid_layout: string; // "2x2", "3x3", "9-way-1-hotspot", etc.
+  scope: LayoutScope;
+  created_by: string;
+  camera_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateLayoutRequest {
+  name: string;
+  description?: string;
+  layout_type: LayoutType;
+  grid_layout: string; // "2x2", "3x3", "9-way-1-hotspot", etc.
+  scope: LayoutScope;
+  created_by: string;
+  cameras: LayoutCameraAssignment[];
+}
+
+export interface UpdateLayoutRequest {
+  name: string;
+  description?: string;
+  cameras: LayoutCameraAssignment[];
+}
+
+export interface LayoutListResponse {
+  layouts: LayoutPreferenceSummary[];
+  total: number;
+}
+
 // Alert types
 export interface Alert {
   id: string;

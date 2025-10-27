@@ -102,6 +102,7 @@ func (h *CameraHandler) ControlPTZ(w http.ResponseWriter, r *http.Request) {
 		"zoom_out":  true,
 		"preset":    true,
 		"home":      true,
+		"stop":      true,
 	}
 
 	if !validCommands[cmd.Command] {

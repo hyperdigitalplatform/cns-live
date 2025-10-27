@@ -60,6 +60,6 @@ VALUES
      '{"fps": 25, "location": {"lat": 25.2048, "lon": 55.2708}, "resolution": "1920x1080"}', NOW() - INTERVAL '30 days'),
 
     ('cam-002-metro-station', 'Camera 2 - 192.168.1.13', 'كاميرا 2', 'METRO',
-     'rtsp://admin:pass@192.168.1.13:554/ch0_0.264', false, 'ONLINE', '192.168.1.13:554', 'camera_device_002',
+     'rtsp://admin:pass@192.168.1.13:554/ch0_0.264', true, 'ONLINE', '192.168.1.13:554', 'camera_device_002',
      '{"fps": 25, "location": {"lat": 25.2697, "lon": 55.3095}, "resolution": "1920x1080"}', NOW() - INTERVAL '30 days')
 ON CONFLICT (id) DO NOTHING;

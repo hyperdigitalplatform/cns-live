@@ -15,6 +15,7 @@ func NewRouter(
 	streamHandler *StreamHandler,
 	cameraHandler *CameraHandler,
 	wsHandler *wsDelivery.Handler,
+	layoutHandler *LayoutHandler,
 ) *chi.Mux {
 	r := chi.NewRouter()
 
@@ -25,10 +26,22 @@ func NewRouter(
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 
-	// CORS middleware
-	r.Use(middleware.SetHeader("Access-Control-Allow-Origin", "*"))
-	r.Use(middleware.SetHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"))
-	r.Use(middleware.SetHeader("Access-Control-Allow-Headers", "Accept, Content-Type, Authorization"))
+	// CORS middleware - handle preflight OPTIONS requests
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Authorization")
+
+			// Handle preflight OPTIONS request
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	// Health and metrics
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +69,15 @@ func NewRouter(
 			r.Get("/", cameraHandler.ListCameras)
 			r.Get("/{id}", cameraHandler.GetCamera)
 			r.Post("/{id}/ptz", cameraHandler.ControlPTZ)
+		})
+
+		// Layout management
+		r.Route("/layouts", func(r chi.Router) {
+			r.Post("/", layoutHandler.CreateLayout)
+			r.Get("/", layoutHandler.ListLayouts)
+			r.Get("/{id}", layoutHandler.GetLayout)
+			r.Put("/{id}", layoutHandler.UpdateLayout)
+			r.Delete("/{id}", layoutHandler.DeleteLayout)
 		})
 	})
 

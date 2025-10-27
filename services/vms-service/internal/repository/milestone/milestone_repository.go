@@ -8,6 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rta/cctv/vms-service/internal/domain"
+	"github.com/rs/zerolog"
+	"net/http"
+	"net/url"
 )
 
 // MilestoneRepository implements repository.CameraRepository for Milestone VMS
@@ -18,6 +21,9 @@ type MilestoneRepository struct {
 	authType      string
 
 	connectionPool *ConnectionPool
+	onvifClients   map[string]*ONVIFClient
+	clientsMutex   sync.RWMutex
+	logger         zerolog.Logger
 	mu             sync.RWMutex
 }
 
@@ -46,6 +52,9 @@ func NewMilestoneRepository(serverAddr, username, password, authType string) *Mi
 		connectionPool: &ConnectionPool{
 			connections: make(map[string]*Connection),
 			maxConns:    5, // 5 connections per recording server
+		},
+		onvifClients: make(map[string]*ONVIFClient),
+		logger:       zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Str("component", "milestone-repository").Logger(),
 		},
 	}
 }
@@ -211,42 +220,6 @@ func (r *MilestoneRepository) GetPTZCapabilities(ctx context.Context, cameraID s
 	}, nil
 }
 
-// ExecutePTZCommand sends PTZ command to camera
-func (r *MilestoneRepository) ExecutePTZCommand(ctx context.Context, cmd *domain.PTZCommand) error {
-	camera, err := r.GetByID(ctx, cmd.CameraID)
-	if err != nil {
-		return err
-	}
-
-	if !camera.PTZEnabled {
-		return fmt.Errorf("camera does not support PTZ: %s", cmd.CameraID)
-	}
-
-	// TODO: Send actual PTZ command via Milestone SDK
-	// For now, just validate and log
-	switch cmd.Action {
-	case domain.PTZActionMove:
-		if cmd.Pan < -1.0 || cmd.Pan > 1.0 {
-			return fmt.Errorf("invalid pan value: %f (must be -1.0 to 1.0)", cmd.Pan)
-		}
-		if cmd.Tilt < -1.0 || cmd.Tilt > 1.0 {
-			return fmt.Errorf("invalid tilt value: %f (must be -1.0 to 1.0)", cmd.Tilt)
-		}
-		if cmd.Zoom < 0.0 || cmd.Zoom > 1.0 {
-			return fmt.Errorf("invalid zoom value: %f (must be 0.0 to 1.0)", cmd.Zoom)
-		}
-	case domain.PTZActionGoToPreset:
-		if cmd.Preset < 1 || cmd.Preset > 256 {
-			return fmt.Errorf("invalid preset number: %d (must be 1-256)", cmd.Preset)
-		}
-	case domain.PTZActionStop:
-		// No validation needed
-	default:
-		return fmt.Errorf("unsupported PTZ action: %s", cmd.Action)
-	}
-
-	return nil
-}
 
 // GetRecordingSegments retrieves available recording segments for time range
 func (r *MilestoneRepository) GetRecordingSegments(ctx context.Context, cameraID string, start, end time.Time) ([]*domain.RecordingSegment, error) {

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -23,7 +24,7 @@ func NewVMSClient(baseURL string, logger zerolog.Logger) *VMSClient {
 	return &VMSClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 60 * time.Second, // Increased for slow PTZ cameras (TrueView ~16s)
+			Timeout: 30 * time.Second,
 		},
 		logger: logger,
 	}
@@ -122,6 +123,34 @@ func (c *VMSClient) ListCameras(ctx context.Context, query domain.CameraQuery) (
 
 // ControlPTZ sends PTZ control command to VMS
 func (c *VMSClient) ControlPTZ(ctx context.Context, cmd domain.PTZCommand) error {
-	// Use the translated version which converts commands to VMS format
-	return c.ControlPTZTranslated(ctx, cmd)
+	endpoint := fmt.Sprintf("%s/vms/cameras/%s/ptz", c.baseURL, cmd.CameraID)
+
+	reqBody, err := json.Marshal(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to control PTZ: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("vms service returned status %d", resp.StatusCode)
+	}
+
+	c.logger.Info().
+		Str("camera_id", cmd.CameraID).
+		Str("command", cmd.Command).
+		Str("user_id", cmd.UserID).
+		Msg("PTZ command executed")
+
+	return nil
 }

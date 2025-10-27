@@ -1,0 +1,14 @@
+      # Camera routes (handled by go-api)
+      - name: api-cameras
+        paths:
+          - ~/api/v1/cameras(/[^/]+)?(/ptz)?$
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - cameras
+          - ptz
+          - dashboard

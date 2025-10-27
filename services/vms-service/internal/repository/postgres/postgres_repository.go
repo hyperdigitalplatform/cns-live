@@ -144,26 +144,6 @@ func (r *PostgresRepository) GetPTZCapabilities(ctx context.Context, cameraID st
 	}, nil
 }
 
-// ExecutePTZCommand sends PTZ command to camera
-func (r *PostgresRepository) ExecutePTZCommand(ctx context.Context, cmd *domain.PTZCommand) error {
-	// Verify camera exists and has PTZ enabled
-	camera, err := r.GetByID(ctx, cmd.CameraID)
-	if err != nil {
-		return err
-	}
-
-	if !camera.PTZEnabled {
-		return fmt.Errorf("camera %s does not support PTZ", cmd.CameraID)
-	}
-
-	// TODO: Implement actual Milestone SDK PTZ command
-	r.logger.Info().
-		Str("camera_id", cmd.CameraID).
-		Str("action", string(cmd.Action)).
-		Msg("PTZ command executed (mock)")
-
-	return nil
-}
 
 // GetRecordingSegments retrieves available recording segments for time range
 func (r *PostgresRepository) GetRecordingSegments(ctx context.Context, cameraID string, start, end time.Time) ([]*domain.RecordingSegment, error) {

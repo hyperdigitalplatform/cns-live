@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,10 +10,12 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	"github.com/rta/cctv/go-api/internal/client"
 	deliveryHttp "github.com/rta/cctv/go-api/internal/delivery/http"
 	deliveryWS "github.com/rta/cctv/go-api/internal/delivery/websocket"
+	"github.com/rta/cctv/go-api/internal/repository/postgres"
 	"github.com/rta/cctv/go-api/internal/repository/valkey"
 	"github.com/rta/cctv/go-api/internal/usecase"
 	"github.com/rs/zerolog"
@@ -40,8 +43,18 @@ func main() {
 
 	logger.Info().Msg("Connected to Valkey")
 
+	// Connect to PostgreSQL
+	db, err := initPostgreSQL(ctx, config, logger)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Failed to connect to PostgreSQL")
+	}
+	defer db.Close()
+
+	logger.Info().Msg("Connected to PostgreSQL")
+
 	// Initialize repositories
 	streamRepo := valkey.NewStreamRepository(valkeyClient, logger)
+	layoutRepo := postgres.NewLayoutRepository(db, logger)
 
 	// Initialize clients
 	streamCounterClient := client.NewStreamCounterClient(config.StreamCounterURL, logger)
@@ -79,6 +92,7 @@ func main() {
 		config.LiveKitWSURL,
 		logger,
 	)
+	layoutUseCase := usecase.NewLayoutUseCase(layoutRepo, logger)
 
 	// Initialize WebSocket hub
 	wsHub := deliveryWS.NewHub(streamUseCase, logger)
@@ -88,16 +102,17 @@ func main() {
 	streamHandler := deliveryHttp.NewStreamHandler(streamUseCase, logger)
 	cameraHandler := deliveryHttp.NewCameraHandler(vmsClient, logger)
 	wsHandler := deliveryWS.NewHandler(wsHub, logger)
+	layoutHandler := deliveryHttp.NewLayoutHandler(layoutUseCase, logger)
 
 	// Setup router
-	router := deliveryHttp.NewRouter(streamHandler, cameraHandler, wsHandler)
+	router := deliveryHttp.NewRouter(streamHandler, cameraHandler, wsHandler, layoutHandler)
 
 	// Start HTTP server
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", config.Port),
 		Handler:      router,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 30 * time.Second, // Increased for slow PTZ camera responses (TrueView ~16s)
 		IdleTimeout:  60 * time.Second,
 	}
 
@@ -132,6 +147,11 @@ type Config struct {
 	ValkeyAddr         string
 	ValkeyPassword     string
 	ValkeyDB           int
+	PostgresHost       string
+	PostgresPort       string
+	PostgresDB         string
+	PostgresUser       string
+	PostgresPassword   string
 	StreamCounterURL   string
 	VMSServiceURL      string
 	MediaMTXURL        string // MediaMTX API URL
@@ -147,6 +167,11 @@ func loadConfig() Config {
 		ValkeyAddr:         getEnv("VALKEY_ADDR", "localhost:6379"),
 		ValkeyPassword:     getEnv("VALKEY_PASSWORD", ""),
 		ValkeyDB:           getEnvInt("VALKEY_DB", 0),
+		PostgresHost:       getEnv("POSTGRES_HOST", "postgres"),
+		PostgresPort:       getEnv("POSTGRES_PORT", "5432"),
+		PostgresDB:         getEnv("POSTGRES_DB", "cctv"),
+		PostgresUser:       getEnv("POSTGRES_USER", "cctv"),
+		PostgresPassword:   getEnv("POSTGRES_PASSWORD", "changeme_postgres"),
 		StreamCounterURL:   getEnv("STREAM_COUNTER_URL", "http://localhost:8087"),
 		VMSServiceURL:      getEnv("VMS_SERVICE_URL", "http://localhost:8081"),
 		MediaMTXURL:        getEnv("MEDIAMTX_URL", "http://localhost:9997"),
@@ -171,4 +196,32 @@ func getEnvInt(key string, defaultValue int) int {
 		return intVal
 	}
 	return defaultValue
+}
+
+func initPostgreSQL(ctx context.Context, config Config, logger zerolog.Logger) (*sql.DB, error) {
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		config.PostgresHost,
+		config.PostgresPort,
+		config.PostgresUser,
+		config.PostgresPassword,
+		config.PostgresDB,
+	)
+
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	// Configure connection pool
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	// Verify connection
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	return db, nil
 }

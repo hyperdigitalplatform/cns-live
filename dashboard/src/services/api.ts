@@ -6,6 +6,13 @@ import type {
   PlaybackResponse,
   ExportRequest,
   ExportResponse,
+  LayoutPreference,
+  LayoutPreferenceSummary,
+  LayoutListResponse,
+  CreateLayoutRequest,
+  UpdateLayoutRequest,
+  LayoutType,
+  LayoutScope,
 } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -34,6 +41,11 @@ class APIClient {
         message: response.statusText,
       }));
       throw new Error(error.message || 'API request failed');
+    }
+
+    // Handle 204 No Content responses (e.g., DELETE)
+    if (response.status === 204) {
+      return undefined as T;
     }
 
     return response.json();
@@ -120,6 +132,48 @@ class APIClient {
     return this.request('/api/v1/playback/export', {
       method: 'POST',
       body: JSON.stringify(request),
+    });
+  }
+
+  // Layout preference endpoints
+  async createLayout(request: CreateLayoutRequest): Promise<LayoutPreference> {
+    return this.request('/api/v1/layouts', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async getLayouts(params?: {
+    layout_type?: LayoutType;
+    scope?: LayoutScope;
+    created_by?: string;
+  }): Promise<LayoutListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.layout_type) queryParams.set('layout_type', params.layout_type);
+    if (params?.scope) queryParams.set('scope', params.scope);
+    if (params?.created_by) queryParams.set('created_by', params.created_by);
+
+    const query = queryParams.toString();
+    return this.request(`/api/v1/layouts${query ? `?${query}` : ''}`);
+  }
+
+  async getLayout(layoutId: string): Promise<LayoutPreference> {
+    return this.request(`/api/v1/layouts/${layoutId}`);
+  }
+
+  async updateLayout(
+    layoutId: string,
+    request: UpdateLayoutRequest
+  ): Promise<LayoutPreference> {
+    return this.request(`/api/v1/layouts/${layoutId}`, {
+      method: 'PUT',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async deleteLayout(layoutId: string): Promise<void> {
+    await this.request(`/api/v1/layouts/${layoutId}`, {
+      method: 'DELETE',
     });
   }
 }

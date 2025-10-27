@@ -620,12 +620,21 @@ services:
       VALKEY_PASSWORD: ${VALKEY_PASSWORD:-}
       VALKEY_DB: 0
 
+      # PostgreSQL configuration
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: cctv
+      POSTGRES_USER: cctv
+      POSTGRES_PASSWORD: password
+
       # Service configuration
       PORT: 8086
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_FORMAT: ${LOG_FORMAT:-json}
     depends_on:
       valkey:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
       vms-service:
         condition: service_healthy
