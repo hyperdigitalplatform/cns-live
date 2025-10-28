@@ -81,6 +81,43 @@ services:
           memory: 1G
 
   # =========================================
+  # MILESTONE SERVICE
+  # =========================================
+  milestone-service:
+    build:
+      context: ./services/milestone-service
+      dockerfile: Dockerfile
+    container_name: cctv-milestone-service
+    restart: unless-stopped
+    networks:
+      - cctv-network
+    ports:
+      - "8085:8080"
+    environment:
+      # Milestone Configuration
+      MILESTONE_BASE_URL: ${MILESTONE_BASE_URL:-https://192.168.1.11}
+      MILESTONE_USERNAME: ${MILESTONE_USERNAME:-raam}
+      MILESTONE_PASSWORD: ${MILESTONE_PASSWORD:-Ilove#123}
+
+      # Service Configuration
+      PORT: 8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # =========================================
   # VMS SERVICE
   # =========================================
   vms-service:

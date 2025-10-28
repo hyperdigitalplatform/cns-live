@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rta/cctv/playback-service/internal/usecase"
+	"github.com/rta/cctv/playback-service/internal/domain"
 	"github.com/rs/zerolog"
 )
 
@@ -54,7 +54,7 @@ func (m *MilestoneClient) GetRecordingMetadata(
 	ctx context.Context,
 	cameraID string,
 	startTime, endTime time.Time,
-) (*usecase.MilestoneRecordingMetadata, error) {
+) (*domain.MilestoneRecordingMetadata, error) {
 	m.logger.Info().
 		Str("camera_id", cameraID).
 		Time("start_time", startTime).
@@ -67,7 +67,7 @@ func (m *MilestoneClient) GetRecordingMetadata(
 	// 2. Calculate total size and segment count
 	// 3. Return metadata
 
-	return &usecase.MilestoneRecordingMetadata{
+	return &domain.MilestoneRecordingMetadata{
 		Available:    false,
 		SegmentCount: 0,
 		TotalSize:    0,

@@ -1,0 +1,131 @@
+# Docker Compose configuration for Milestone XProtect integration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.milestone.yml up
+
+version: '3.8'
+
+services:
+  # VMS Service - Add Milestone configuration
+  vms-service:
+    environment:
+      # Milestone Connection
+      - MILESTONE_BASE_URL=${MILESTONE_BASE_URL:-http://milestone-server:80}
+      - MILESTONE_USERNAME=${MILESTONE_USERNAME:-admin}
+      - MILESTONE_PASSWORD=${MILESTONE_PASSWORD}
+      - MILESTONE_AUTH_TYPE=${MILESTONE_AUTH_TYPE:-basic}
+      - MILESTONE_SESSION_TIMEOUT=${MILESTONE_SESSION_TIMEOUT:-3600}
+      - MILESTONE_RETRY_ATTEMPTS=${MILESTONE_RETRY_ATTEMPTS:-3}
+      - MILESTONE_RETRY_DELAY=${MILESTONE_RETRY_DELAY:-5s}
+      - MILESTONE_MAX_CONNECTIONS=${MILESTONE_MAX_CONNECTIONS:-50}
+
+      # Feature Flags
+      - MILESTONE_ENABLED=${MILESTONE_ENABLED:-true}
+      - MILESTONE_AUTO_SYNC=${MILESTONE_AUTO_SYNC:-false}
+      - MILESTONE_SYNC_INTERVAL=${MILESTONE_SYNC_INTERVAL:-3600}
+
+  # Recording Service - Add Milestone recording configuration
+  recording-service:
+    environment:
+      # Milestone Connection (shared config)
+      - MILESTONE_BASE_URL=${MILESTONE_BASE_URL:-http://milestone-server:80}
+      - MILESTONE_USERNAME=${MILESTONE_USERNAME:-admin}
+      - MILESTONE_PASSWORD=${MILESTONE_PASSWORD}
+      - MILESTONE_AUTH_TYPE=${MILESTONE_AUTH_TYPE:-basic}
+
+      # Recording Configuration
+      - RECORDING_DEFAULT_DURATION=${RECORDING_DEFAULT_DURATION:-900}
+      - RECORDING_MAX_DURATION=${RECORDING_MAX_DURATION:-7200}
+      - RECORDING_MIN_DURATION=${RECORDING_MIN_DURATION:-60}
+      - RECORDING_AUTO_STOP=${RECORDING_AUTO_STOP:-true}
+      - RECORDING_NOTIFICATIONS=${RECORDING_NOTIFICATIONS:-true}
+      - RECORDING_MAX_CONCURRENT=${RECORDING_MAX_CONCURRENT:-50}
+
+      # Session Management
+      - RECORDING_SESSION_PERSIST=${RECORDING_SESSION_PERSIST:-true}
+      - RECORDING_SESSION_RECOVER=${RECORDING_SESSION_RECOVER:-true}
+
+  # Playback Service - Add Milestone playback configuration
+  playback-service:
+    environment:
+      # Milestone Connection
+      - MILESTONE_BASE_URL=${MILESTONE_BASE_URL:-http://milestone-server:80}
+      - MILESTONE_USERNAME=${MILESTONE_USERNAME:-admin}
+      - MILESTONE_PASSWORD=${MILESTONE_PASSWORD}
+      - MILESTONE_AUTH_TYPE=${MILESTONE_AUTH_TYPE:-basic}
+
+      # Playback Configuration
+      - PLAYBACK_CACHE_ENABLED=${PLAYBACK_CACHE_ENABLED:-true}
+      - PLAYBACK_CACHE_TTL=${PLAYBACK_CACHE_TTL:-300}
+      - PLAYBACK_MAX_CONCURRENT_STREAMS=${PLAYBACK_MAX_CONCURRENT_STREAMS:-50}
+      - PLAYBACK_MAX_SPEED=${PLAYBACK_MAX_SPEED:-8}
+      - PLAYBACK_MIN_SPEED=${PLAYBACK_MIN_SPEED:--8}
+
+      # HLS Configuration
+      - HLS_SEGMENT_DURATION=${HLS_SEGMENT_DURATION:-4}
+      - HLS_PLAYLIST_LENGTH=${HLS_PLAYLIST_LENGTH:-5}
+      - HLS_OUTPUT_PATH=${HLS_OUTPUT_PATH:-/tmp/hls}
+
+      # FFmpeg Configuration
+      - FFMPEG_THREADS=${FFMPEG_THREADS:-4}
+      - FFMPEG_VIDEO_CODEC=${FFMPEG_VIDEO_CODEC:-libx264}
+      - FFMPEG_AUDIO_CODEC=${FFMPEG_AUDIO_CODEC:-aac}
+      - FFMPEG_PRESET=${FFMPEG_PRESET:-fast}
+    volumes:
+      - hls-cache:/tmp/hls
+
+  # Go API - Add Milestone proxy configuration
+  go-api:
+    environment:
+      # Service URLs
+      - VMS_SERVICE_URL=${VMS_SERVICE_URL:-http://vms-service:8081}
+      - RECORDING_SERVICE_URL=${RECORDING_SERVICE_URL:-http://recording-service:8083}
+      - PLAYBACK_SERVICE_URL=${PLAYBACK_SERVICE_URL:-http://playback-service:8084}
+
+      # Milestone Feature Flag
+      - MILESTONE_ENABLED=${MILESTONE_ENABLED:-true}
+
+      # API Rate Limiting (per user)
+      - MILESTONE_RATE_LIMIT_DISCOVERY=${MILESTONE_RATE_LIMIT_DISCOVERY:-10}
+      - MILESTONE_RATE_LIMIT_RECORDING=${MILESTONE_RATE_LIMIT_RECORDING:-5}
+      - MILESTONE_RATE_LIMIT_QUERY=${MILESTONE_RATE_LIMIT_QUERY:-20}
+
+  # PostgreSQL - Ensure migrations run
+  postgres:
+    # No additional config needed, migrations run automatically via services
+
+  # Optional: Milestone XProtect Mock Server (for testing)
+  # Uncomment if you don't have a real Milestone server
+  # milestone-mock:
+  #   image: mockserver/mockserver:latest
+  #   container_name: cctv-milestone-mock
+  #   ports:
+  #     - "1080:1080"
+  #   environment:
+  #     - MOCKSERVER_PROPERTY_FILE=/config/mockserver.properties
+  #   volumes:
+  #     - ./config/milestone-mock:/config
+  #   networks:
+  #     - cctv-network
+
+volumes:
+  hls-cache:
+    driver: local
+
+# Example .env file for Milestone integration:
+#
+# # Milestone XProtect Server
+# MILESTONE_BASE_URL=http://10.0.1.100:80
+# MILESTONE_USERNAME=api_user
+# MILESTONE_PASSWORD=secure_password_here
+# MILESTONE_AUTH_TYPE=basic
+#
+# # Recording Settings
+# RECORDING_DEFAULT_DURATION=900
+# RECORDING_MAX_DURATION=7200
+#
+# # Playback Settings
+# PLAYBACK_CACHE_ENABLED=true
+# PLAYBACK_MAX_CONCURRENT_STREAMS=50
+#
+# # Feature Flags
+# MILESTONE_ENABLED=true
+# MILESTONE_AUTO_SYNC=false

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useCameraStore } from '@/stores/cameraStore';
 import { useFolderStore } from '@/stores/folderStore';
 import { CameraTreeView } from './CameraTreeView';
+import { MilestoneCameraDiscovery } from './MilestoneCameraDiscovery';
 import type { Camera, CameraSource, CameraStatus } from '@/types';
 import {
   Search,
@@ -13,6 +14,7 @@ import {
   Minimize2,
   Folder,
   Video,
+  Download,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import {
@@ -56,6 +58,7 @@ export function CameraSidebarNew({
 
   // Dialog states
   const [showCreateFolderDialog, setShowCreateFolderDialog] = useState(false);
+  const [showMilestoneDiscovery, setShowMilestoneDiscovery] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [folderNameAr, setFolderNameAr] = useState('');
 
@@ -101,6 +104,11 @@ export function CameraSidebarNew({
       setFolderName('');
       setShowCreateFolderDialog(false);
     }
+  };
+
+  const handleMilestoneImport = async () => {
+    // Refresh camera list after import
+    await fetchCameras();
   };
 
   const sources: (CameraSource | 'ALL')[] = [
@@ -185,6 +193,13 @@ export function CameraSidebarNew({
                 showFilters && 'rotate-180'
               )}
             />
+          </button>
+          <button
+            onClick={() => setShowMilestoneDiscovery(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white hover:bg-purple-700 rounded-lg transition-colors text-sm font-medium"
+            title="Import cameras from Milestone XProtect"
+          >
+            <Download className="w-4 h-4" />
           </button>
         </div>
 
@@ -340,6 +355,13 @@ export function CameraSidebarNew({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Milestone Camera Discovery Dialog */}
+      <MilestoneCameraDiscovery
+        open={showMilestoneDiscovery}
+        onClose={() => setShowMilestoneDiscovery(false)}
+        onImport={handleMilestoneImport}
+      />
     </div>
   );
 }

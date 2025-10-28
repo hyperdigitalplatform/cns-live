@@ -263,12 +263,26 @@ services:
           - cameras
           - dashboard
 
+      - name: api-cameras-import
+        paths:
+          - /api/v1/cameras/import
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - cameras
+          - import
+          - dashboard
+
       - name: api-cameras-all
         paths:
           - ~/api/v1/cameras(/.*)?$
         methods:
           - GET
           - POST
+          - DELETE
           - OPTIONS
         strip_path: false
         preserve_host: false
@@ -291,6 +305,165 @@ services:
         tags:
           - layouts
           - dashboard
+
+  # Milestone Service - Recording Control & Timeline
+  - name: milestone-service
+    url: http://milestone-service:8080
+    protocol: http
+    connect_timeout: 10000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    tags:
+      - rta-cctv
+      - milestone
+      - recording
+
+    routes:
+      - name: milestone-health
+        paths:
+          - /milestone/health
+        methods:
+          - GET
+        strip_path: true
+        preserve_host: false
+        tags:
+          - health
+
+      # Camera discovery route (must be before general cameras route)
+      - name: milestone-cameras-discover
+        paths:
+          - /api/v1/milestone/cameras/discover
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - cameras
+          - discovery
+          - dashboard
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /api/v1/cameras/discover
+
+      # Camera list route
+      - name: milestone-cameras
+        paths:
+          - /api/v1/milestone/cameras
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - cameras
+          - dashboard
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /api/v1/cameras
+
+      # Recording control routes
+      - name: milestone-start-recording
+        paths:
+          - /api/v1/milestone/recordings/start
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - recording
+          - dashboard
+
+      - name: milestone-stop-recording
+        paths:
+          - /api/v1/milestone/recordings/stop
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - recording
+          - dashboard
+
+      - name: milestone-recording-status
+        paths:
+          - ~/api/v1/milestone/recordings/status/[^/]+$
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - recording
+          - dashboard
+
+      # Sequence routes
+      - name: milestone-sequence-types
+        paths:
+          - ~/api/v1/milestone/sequences/types/[^/]+$
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - sequences
+          - dashboard
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /api/v1/sequences/types/$(uri_captures[1])
+
+      - name: milestone-sequences
+        paths:
+          - /api/v1/milestone/sequences
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - sequences
+          - dashboard
+
+      # Playback stream route
+      - name: milestone-playback-stream
+        paths:
+          - ~/api/v1/cameras/[^/]+/playback/stream$
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - playback
+          - dashboard
+
+      # Timeline route
+      - name: milestone-timeline
+        paths:
+          - /api/v1/milestone/timeline
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - timeline
+          - dashboard
+        plugins:
+          - name: request-transformer
+            config:
+              replace:
+                uri: /api/v1/timeline
 
   # Stream Counter Service - Internal Quota Management
   - name: stream-counter-service
@@ -551,3 +724,4 @@ plugins:
 # - Proxy (client traffic): http://kong:8000
 # - Admin API (management): http://kong:8001
 # - Metrics: http://kong:8001/metrics
+

@@ -9,6 +9,9 @@ import {
   Home,
   Pin,
   PinOff,
+  Circle,
+  Square,
+  Video,
 } from 'lucide-react';
 import { api } from '@/services/api';
 import { cn } from '@/utils/cn';
@@ -19,6 +22,9 @@ interface PTZControlsProps {
   onTogglePin: () => void;
   isPinned: boolean;
   cellSize?: 'hotspot' | 'large' | 'medium' | 'small';
+  isRecording?: boolean;
+  onRecordingChange?: (isRecording: boolean) => void;
+  onViewRecordings?: () => void;
 }
 
 export function PTZControls({
@@ -26,9 +32,13 @@ export function PTZControls({
   onTogglePin,
   isPinned,
   cellSize = 'medium',
+  isRecording = false,
+  onRecordingChange,
+  onViewRecordings,
 }: PTZControlsProps) {
   const [activeButton, setActiveButton] = useState<string | null>(null);
   const [isCommandPending, setIsCommandPending] = useState(false);
+  const [recordingLoading, setRecordingLoading] = useState(false);
 
   const handlePTZCommand = async (
     command: string,
@@ -60,6 +70,30 @@ export function PTZControls({
       });
     }
     setActiveButton(null);
+  };
+
+  const handleToggleRecording = async () => {
+    setRecordingLoading(true);
+    try {
+      if (isRecording) {
+        await api.stopMilestoneRecording(camera.id);
+        onRecordingChange?.(false);
+      } else {
+        await api.startMilestoneRecording({
+          cameraId: camera.id,
+          durationMinutes: 30
+        });
+        onRecordingChange?.(true);
+      }
+    } catch (error) {
+      console.error('Recording control error:', error);
+    } finally {
+      setRecordingLoading(false);
+    }
+  };
+
+  const handleViewRecordings = () => {
+    onViewRecordings?.();
   };
 
   if (!camera.ptz_enabled) {
@@ -222,6 +256,45 @@ export function PTZControls({
           title="Zoom Out"
         >
           <ZoomOut className={cn('text-white', size.icon)} />
+        </button>
+      </div>
+
+      {/* Divider */}
+      <div className="h-px bg-white/10 my-1.5" />
+
+      {/* Recording controls */}
+      <div className={cn('flex flex-col', size.gap)}>
+        <button
+          onClick={handleToggleRecording}
+          disabled={recordingLoading}
+          className={cn(
+            'rounded transition-colors flex items-center justify-center',
+            recordingLoading
+              ? 'opacity-50 cursor-not-allowed'
+              : isRecording
+              ? 'bg-red-600/80 hover:bg-red-600 cursor-pointer'
+              : 'bg-white/10 hover:bg-white/20 cursor-pointer',
+            size.button
+          )}
+          title={isRecording ? 'Stop Recording' : 'Start Recording'}
+        >
+          {recordingLoading ? (
+            <div className={cn('border-2 border-white border-t-transparent rounded-full animate-spin', size.icon)} />
+          ) : isRecording ? (
+            <Square className={cn('text-white fill-current', size.icon)} />
+          ) : (
+            <Circle className={cn('text-white fill-current', size.icon)} />
+          )}
+        </button>
+        <button
+          onClick={handleViewRecordings}
+          className={cn(
+            'bg-white/10 rounded transition-colors flex items-center justify-center hover:bg-white/20 cursor-pointer',
+            size.button
+          )}
+          title="View Recordings"
+        >
+          <Video className={cn('text-white', size.icon)} />
         </button>
       </div>
 

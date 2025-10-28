@@ -71,7 +71,7 @@ func main() {
 	handler := httpdelivery.NewHandler(cameraRepo, cacheRepo, logger)
 
 	// Create router
-	router := httpdelivery.NewRouter(handler)
+	router := httpdelivery.NewRouter(handler, nil)
 
 	// Start HTTP server
 	port := getEnv("PORT", "8081")

@@ -1,15 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CameraSidebarNew } from '@/components/CameraSidebarNew';
+import { CameraSidebarRecordingSection } from '@/components/CameraSidebarRecordingSection';
 import { StreamGridEnhanced, StreamGridEnhancedRef } from '@/components/StreamGridEnhanced';
+import { ToastContainer } from '@/components/Toast';
+import { X, Info, Trash2, AlertTriangle } from 'lucide-react';
 import type { Camera } from '@/types';
 import { useFolderStore } from '@/stores/folderStore';
 import { useStreamStore } from '@/stores/streamStore';
+import { useCameraStore } from '@/stores/cameraStore';
+import { cn } from '@/utils/cn';
+import { api } from '@/services/api';
+import { useToast } from '@/hooks/useToast';
 
 export function LiveViewEnhanced() {
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [showCameraDetails, setShowCameraDetails] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingCamera, setDeletingCamera] = useState(false);
   const gridRef = useRef<StreamGridEnhancedRef>(null);
   const { initializeDefaultFolders, folders } = useFolderStore();
   const { reservations, releaseStream } = useStreamStore();
+  const { cameras, selectCamera, selectedCamera, fetchCameras } = useCameraStore();
+  const { toasts, removeToast, error: showError, warning: showWarning } = useToast();
 
   // Initialize folders on mount
   useEffect(() => {
@@ -49,30 +61,214 @@ export function LiveViewEnhanced() {
       const success = gridRef.current.addCameraToNextAvailableCell(camera);
       if (success) {
         setSelectedCameraId(camera.id);
+        selectCamera(camera);
+        // Don't show camera details panel when dragging
+        setShowCameraDetails(false);
       } else {
         // Grid is full
-        alert('Grid is full. Please clear some cells or change the layout.');
+        showWarning('Grid is full. Please clear some cells or change the layout.');
       }
     }
   };
 
   const handleCameraDragStart = (camera: Camera, folderId: string | null) => {
     setSelectedCameraId(camera.id);
+    selectCamera(camera);
+    // Don't show camera details panel when dragging
+    setShowCameraDetails(false);
+  };
+
+  const handleCloseCameraDetails = () => {
+    setShowCameraDetails(false);
+  };
+
+  const handleDeleteCamera = async () => {
+    if (!selectedCamera) return;
+
+    setDeletingCamera(true);
+    try {
+      await api.deleteCamera(selectedCamera.id);
+
+      // Close details panel and refresh camera list
+      setShowCameraDetails(false);
+      setShowDeleteConfirm(false);
+      selectCamera(null);
+      await fetchCameras();
+    } catch (error) {
+      console.error('Failed to delete camera:', error);
+      showError('Failed to delete camera. Please try again.');
+    } finally {
+      setDeletingCamera(false);
+    }
   };
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* Left Sidebar - Camera Tree */}
       <CameraSidebarNew
         onCameraDoubleClick={handleCameraDoubleClick}
         onCameraDragStart={handleCameraDragStart}
         selectedCameraId={selectedCameraId}
       />
 
-      {/* Main content */}
+      {/* Main content - Camera Grid */}
       <div className="flex-1 overflow-hidden">
         <StreamGridEnhanced ref={gridRef} />
       </div>
+
+      {/* Right Sidebar - Camera Details */}
+      {showCameraDetails && selectedCamera && (
+        <div className="w-96 h-full bg-white border-l border-gray-200 flex flex-col shadow-lg">
+          {/* Header */}
+          <div className="p-4 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    Camera Details
+                  </h3>
+                </div>
+                <p className="text-sm text-gray-600 truncate" title={selectedCamera.name}>
+                  {selectedCamera.name}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseCameraDetails}
+                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0 ml-2"
+                title="Close details"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Camera Info */}
+          <div className="p-4 border-b border-gray-200 space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Status
+              </label>
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                    selectedCamera.status === 'ONLINE' &&
+                      'bg-green-100 text-green-800',
+                    selectedCamera.status === 'OFFLINE' &&
+                      'bg-gray-100 text-gray-800',
+                    selectedCamera.status === 'MAINTENANCE' &&
+                      'bg-yellow-100 text-yellow-800',
+                    selectedCamera.status === 'ERROR' && 'bg-red-100 text-red-800'
+                  )}
+                >
+                  {selectedCamera.status}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Source
+              </label>
+              <p className="text-sm text-gray-900">
+                {selectedCamera.source.replace('_', ' ')}
+              </p>
+            </div>
+
+            {selectedCamera.milestone_device_id && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Milestone Device ID
+                </label>
+                <p className="text-sm text-gray-900 font-mono text-xs break-all">
+                  {selectedCamera.milestone_device_id}
+                </p>
+              </div>
+            )}
+
+            {selectedCamera.location && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Location
+                </label>
+                <p className="text-sm text-gray-900">
+                  {selectedCamera.location.address}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="p-4 border-b border-gray-200">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors border border-red-200"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="text-sm font-medium">Delete Camera</span>
+            </button>
+          </div>
+
+          {/* Recording Section */}
+          <div className="flex-1 overflow-y-auto">
+            <CameraSidebarRecordingSection selectedCamera={selectedCamera} />
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && selectedCamera && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Delete Camera?
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Are you sure you want to delete <strong>{selectedCamera.name}</strong>?
+                    This will remove the camera and all its associated data. This action cannot be undone.
+                  </p>
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      disabled={deletingCamera}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDeleteCamera}
+                      disabled={deletingCamera}
+                      className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {deletingCamera ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          Delete Camera
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func NewRouter(playbackHandler *PlaybackHandler) *chi.Mux {
+func NewRouter(playbackHandler *PlaybackHandler, milestoneHandler *MilestonePlaybackHandler) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Middleware
@@ -43,6 +43,16 @@ func NewRouter(playbackHandler *PlaybackHandler) *chi.Mux {
 			r.Route("/cache", func(r chi.Router) {
 				r.Get("/stats", playbackHandler.GetCacheStats)
 			})
+		})
+
+		// Milestone playback routes
+		r.Route("/cameras/{cameraId}/playback", func(r chi.Router) {
+			r.Post("/query", milestoneHandler.QueryRecordings)
+			r.Get("/timeline", milestoneHandler.GetTimelineData)
+			r.Post("/start", milestoneHandler.StartPlayback)
+			r.Get("/stream", milestoneHandler.StreamPlayback)
+			r.Get("/snapshot", milestoneHandler.GetSnapshot)
+			r.Post("/control", milestoneHandler.ControlPlayback)
 		})
 	})
 

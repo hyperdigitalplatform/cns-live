@@ -1,0 +1,151 @@
+=== Milestone XProtect SOAP API Testing (Basic Auth) ===
+
+Authentication: HTTP Basic Authentication
+Username: raam
+
+Using Camera ID: a8a8b9dc-3995-49ed-9b00-62caac2ce74a
+
+=== TEST 1: SequencesGetTypes ===
+Getting available sequence types for camera...
+
+Request:
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <SequencesGetTypes xmlns="http://videoos.net/2/XProtectCSRecorderCommand">
+      <deviceId>a8a8b9dc-3995-49ed-9b00-62caac2ce74a</deviceId>
+    </SequencesGetTypes>
+  </soap:Body>
+</soap:Envelope>
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>No token supplied</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>1</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== TEST 2: IsManualRecording ===
+Checking if camera is currently recording...
+
+Request:
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <IsManualRecording xmlns="http://videoos.net/2/XProtectCSRecorderCommand">
+      <deviceIds xmlns:a="http://microsoft.com/wsdl/types/">
+        <a:guid>a8a8b9dc-3995-49ed-9b00-62caac2ce74a</a:guid>
+      </deviceIds>
+    </IsManualRecording>
+  </soap:Body>
+</soap:Envelope>
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>No token supplied</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>1</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== TEST 3: StartRecording ===
+Starting 15-minute manual recording...
+
+Request:
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <StartRecording xmlns="http://videoos.net/2/XProtectCSRecorderCommand">
+      <deviceId>a8a8b9dc-3995-49ed-9b00-62caac2ce74a</deviceId>
+      <recordingTimeMicroSeconds>900000000</recordingTimeMicroSeconds>
+    </StartRecording>
+  </soap:Body>
+</soap:Envelope>
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>No token supplied</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>1</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== TEST 4: IsManualRecording (After Starting) ===
+Checking if recording started...
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>No token supplied</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>1</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== TEST 5: SequencesGet ===
+Getting recording sequences from last hour...
+
+Using Sequence Type ID: 00000000-0000-0000-0000-000000000000
+
+Request:
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <SequencesGet xmlns="http://videoos.net/2/XProtectCSRecorderCommand">
+      <deviceId>a8a8b9dc-3995-49ed-9b00-62caac2ce74a</deviceId>
+      <sequenceType xmlns:a="http://microsoft.com/wsdl/types/">00000000-0000-0000-0000-000000000000</sequenceType>
+      <minTime>2025-10-27T18:19:39Z</minTime>
+      <maxTime>2025-10-27T19:19:38Z</maxTime>
+      <maxCount>100</maxCount>
+    </SequencesGet>
+  </soap:Body>
+</soap:Envelope>
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>No token supplied</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>1</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== TEST 6: TimeLineInformationGet ===
+Getting timeline data for last hour...
+
+Request:
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <TimeLineInformationGet xmlns="http://videoos.net/2/XProtectCSRecorderCommand">
+      <deviceId>a8a8b9dc-3995-49ed-9b00-62caac2ce74a</deviceId>
+      <timeLineInformationTypes xmlns:a="http://microsoft.com/wsdl/types/">
+        <a:guid>00000000-0000-0000-0000-000000000000</a:guid>
+      </timeLineInformationTypes>
+      <timeLineInformationBeginTime>2025-10-27T18:19:39Z</timeLineInformationBeginTime>
+      <timeLineInformationInterval>
+        <MicroSeconds>60000000</MicroSeconds>
+      </timeLineInformationInterval>
+      <timeLineInformationCount>60</timeLineInformationCount>
+    </TimeLineInformationGet>
+  </soap:Body>
+</soap:Envelope>
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>No token supplied</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>1</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== TEST 7: JPEGGetAt ===
+Getting JPEG snapshot from 1 minute ago...
+
+Request:
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <JPEGGetAt xmlns="http://videoos.net/2/XProtectCSRecorderCommand">
+      <deviceId>a8a8b9dc-3995-49ed-9b00-62caac2ce74a</deviceId>
+      <time>2025-10-27T19:18:39Z</time>
+    </JPEGGetAt>
+  </soap:Body>
+</soap:Envelope>
+
+Response (truncated if large):
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>No token supplied</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>1</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== Testing Complete ===
+
+Summary:
+1. SequencesGetTypes - Check response above
+2. IsManualRecording (before) - Check response above
+3. StartRecording - Check response above
+4. IsManualRecording (after) - Check response above
+5. SequencesGet - Check response above
+6. TimeLineInformationGet - Check response above
+7. JPEGGetAt - Check response above

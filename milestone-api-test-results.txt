@@ -1,0 +1,209 @@
+=== Milestone XProtect Recording & Playback API Testing ===
+
+1. Authentication - Getting OAuth 2.0 token
+POST https://192.168.1.11/API/IDP/connect/token
+
+Response:
+{
+    "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IkIxNTk2MzI1RDJCNjlBQTMzQjZFMkFGNjEwQjVCNjIzIiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2Rlc2t0b3AtOHJwZmF1aC9JRFAiLCJuYmYiOjE3NjE1ODY2MjMsImlhdCI6MTc2MTU4NjYyMywiZXhwIjoxNzYxNTkwMjIzLCJhdWQiOlsibWFuYWdlbWVudHNlcnZlciIsImh0dHBzOi8vZGVza3RvcC04cnBmYXVoL0lEUC9yZXNvdXJjZXMiXSwic2NvcGUiOlsibWFuYWdlbWVudHNlcnZlciJdLCJhbXIiOlsicHdkIl0sImNsaWVudF9pZCI6IkdyYW50VmFsaWRhdG9yQ2xpZW50Iiwic3ViIjoiRjFEQkU2MkQtNUQ3OC00NEMyLUE0OTktRDgxNjE3OUM3NjIwIiwiYXV0aF90aW1lIjoxNzYxNTg2NjIzLCJpZHAiOiJsb2NhbCIsIm5hbWUiOiJyYWFtIiwidXBkYXRlZF9hdCI6IjE3NjE1Nzc3MDciLCJqdGkiOiI5QTM5NjYxNzhDODBCOTA3NzZENDVEMkZBOEYzNjZBOSJ9.QdPI865hW8mfWsGBKwQneGA9d803cwpJHGC3bxlRgqMN7pcna6voLenDYpZEsfncMNM3cWqWaW1eWAa1TM0FwzRhoCQhbN6yVhdJrZmXbn61YS5kttDP2_l-IcMoNfdnhZBKUcgzAq3gOiLQy3lPeQtt4tzbYewhAwupEOIqfqZVKrWWzi2L5gMLBRV0s6NOeUU0OzHJ7DtlOuKKvgp_qh7DW2g2F88Afm6m5M2YxDM4MSwTT7v9NfnS7AhHp7KnS2cQloY6JRKnC1GyqcXvfBNjoK07tbij1ArEIOEHfEC53yrUau7WehNvtWYaLhxo52RbfdEHR3B2zmTlV_IMOA",
+    "expires_in": 3600,
+    "token_type": "Bearer",
+    "scope": "managementserver"
+}
+
+Token obtained successfully (length: 963 chars)
+
+2. Getting Camera IDs
+GET https://192.168.1.11/api/rest/v1/cameras
+
+Response:
+{
+    "array": [
+        {
+            "displayName": "GUANGZHOU T18156-AF (192.168.1.13) - Camera 1",
+            "enabled": true,
+            "id": "a8a8b9dc-3995-49ed-9b00-62caac2ce74a",
+            "name": "GUANGZHOU T18156-AF (192.168.1.13) - Camera 1",
+            "channel": 0,
+            "description": "",
+            "createdDate": "0001-01-01T00:00:00.0000000",
+            "lastModified": "2025-10-27T15:03:52.8070000Z",
+            "gisPoint": "POINT EMPTY",
+            "shortName": "",
+            "icon": 0,
+            "coverageDirection": 0,
+            "coverageDepth": 0,
+            "coverageFieldOfView": 0,
+            "recordingFramerate": 5,
+            "recordKeyframesOnly": false,
+            "recordOnRelatedDevices": true,
+            "ptzEnabled": true,
+            "recordingEnabled": true,
+            "prebufferEnabled": true,
+            "prebufferInMemory": true,
+            "prebufferSeconds": 3,
+            "edgeStorageEnabled": false,
+            "edgeStoragePlaybackEnabled": false,
+            "manualRecordingTimeoutEnabled": true,
+            "manualRecordingTimeoutMinutes": 15,
+            "recordingStorage": {
+                "type": "storages",
+                "id": "0605d1b6-16bb-4adf-a32c-ef0a1991f951"
+            },
+            "failoverSetting": "FullSupport",
+            "relations": {
+                "parent": {
+                    "type": "hardware",
+                    "id": "5a94379d-468c-40ee-9c16-8d98be28e1dd"
+                },
+                "self": {
+                    "type": "cameras",
+                    "id": "a8a8b9dc-3995-49ed-9b00-62caac2ce74a"
+                }
+            }
+        },
+        {
+            "displayName": "tp-link Tapo C225 (192.168.1.8) - Camera 1",
+            "enabled": true,
+            "id": "d47fa4e9-8171-4cc2-a421-95a3194f6a1d",
+            "name": "tp-link Tapo C225 (192.168.1.8) - Camera 1",
+            "channel": 0,
+            "description": "",
+            "createdDate": "0001-01-01T00:00:00.0000000",
+            "lastModified": "2025-10-27T15:05:09.2770000Z",
+            "gisPoint": "POINT EMPTY",
+            "shortName": "",
+            "icon": 0,
+            "coverageDirection": 0,
+            "coverageDepth": 0,
+            "coverageFieldOfView": 0,
+            "recordingFramerate": 5,
+            "recordKeyframesOnly": false,
+            "recordOnRelatedDevices": true,
+            "ptzEnabled": true,
+            "recordingEnabled": true,
+            "prebufferEnabled": true,
+            "prebufferInMemory": true,
+            "prebufferSeconds": 3,
+            "edgeStorageEnabled": false,
+            "edgeStoragePlaybackEnabled": false,
+            "manualRecordingTimeoutEnabled": true,
+            "manualRecordingTimeoutMinutes": 15,
+            "recordingStorage": {
+                "type": "storages",
+                "id": "0605d1b6-16bb-4adf-a32c-ef0a1991f951"
+            },
+            "failoverSetting": "FullSupport",
+            "relations": {
+                "parent": {
+                    "type": "hardware",
+                    "id": "c202aec3-502b-493d-aff4-8fde3544141e"
+                },
+                "self": {
+                    "type": "cameras",
+                    "id": "d47fa4e9-8171-4cc2-a421-95a3194f6a1d"
+                }
+            }
+        }
+    ]
+}
+
+Using Camera ID: a8a8b9dc-3995-49ed-9b00-62caac2ce74a
+
+3. Testing Recordings Endpoints
+
+3a. GET https://192.168.1.11/api/rest/v1/recordings
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: recordings" } ] } }
+HTTP_STATUS:404
+
+3b. GET https://192.168.1.11/api/rest/v1/recordings/cameras/a8a8b9dc-3995-49ed-9b00-62caac2ce74a
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: recordings" } ] } }
+HTTP_STATUS:404
+
+3c. GET https://192.168.1.11/api/rest/v1/cameras/a8a8b9dc-3995-49ed-9b00-62caac2ce74a/recordings
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: recordings" } ] } }
+HTTP_STATUS:404
+
+4. Testing Sequences Endpoints
+
+4a. GET https://192.168.1.11/api/rest/v1/sequences
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: sequences" } ] } }
+HTTP_STATUS:404
+
+4b. GET https://192.168.1.11/api/rest/v1/cameras/a8a8b9dc-3995-49ed-9b00-62caac2ce74a/sequences
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: sequences" } ] } }
+HTTP_STATUS:404
+
+5. Testing Manual Recording Control Endpoints
+
+5a. POST https://192.168.1.11/api/rest/v1/cameras/a8a8b9dc-3995-49ed-9b00-62caac2ce74a/recording/start
+Response:
+
+HTTP_STATUS:000
+
+5b. POST https://192.168.1.11/api/rest/v1/recordings/start (with camera ID in body)
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: recordings" } ] } }
+HTTP_STATUS:404
+
+6. Testing Output/Control Endpoints
+
+6a. GET https://192.168.1.11/api/rest/v1/cameras/a8a8b9dc-3995-49ed-9b00-62caac2ce74a/outputs
+Response:
+{  "error" : {  "httpCode" : 400,  "details" :  [ {  "errorText" : "Invalid parent. cameras/a8a8b9dc-3995-49ed-9b00-62caac2ce74a/OutputFolder" } ] } }
+HTTP_STATUS:400
+
+6b. GET https://192.168.1.11/api/rest/v1/outputs
+Response:
+{  "array" :  [  ] }
+HTTP_STATUS:200
+
+7. Testing Bookmarks Endpoint
+
+7a. GET https://192.168.1.11/api/rest/v1/bookmarks
+Response:
+{  "error" : {  "httpCode" : 400,  "details" :  [ {  "errorText" : "Bad request: Unknown request" } ] } }
+HTTP_STATUS:400
+
+8. Testing Playback Endpoints
+
+8a. GET https://192.168.1.11/api/rest/v1/playback
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: playback" } ] } }
+HTTP_STATUS:404
+
+8b. GET https://192.168.1.11/api/rest/v1/cameras/a8a8b9dc-3995-49ed-9b00-62caac2ce74a/playback
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: playback" } ] } }
+HTTP_STATUS:404
+
+9. Testing Live Stream Endpoints
+
+9a. GET https://192.168.1.11/api/rest/v1/cameras/a8a8b9dc-3995-49ed-9b00-62caac2ce74a/live
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: live" } ] } }
+HTTP_STATUS:404
+
+10. Testing Investigations/Evidence Endpoints
+
+10a. GET https://192.168.1.11/api/rest/v1/evidenceLocks
+Response:
+{  "error" : {  "httpCode" : 400,  "details" :  [ {  "errorText" : "Bad request: Unknown request" } ] } }
+HTTP_STATUS:400
+
+10b. GET https://192.168.1.11/api/rest/v1/investigations
+Response:
+{  "error" : {  "httpCode" : 404,  "details" :  [ {  "errorText" : "Unknown resource: investigations" } ] } }
+HTTP_STATUS:404
+
+=== Testing Complete ===
+
+Summary:
+- Camera ID used for testing: a8a8b9dc-3995-49ed-9b00-62caac2ce74a
+- Check HTTP status codes above
+- 200 = Success, 404 = Not Found, 405 = Method Not Allowed, 401 = Unauthorized

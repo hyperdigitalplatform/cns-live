@@ -1,0 +1,42 @@
+=== Milestone XProtect SOAP API Testing (OAuth Token) ===
+
+1. Getting OAuth 2.0 token...
+✅ Token obtained (length: 963 chars)
+
+Using Camera ID: a8a8b9dc-3995-49ed-9b00-62caac2ce74a
+
+=== TEST 1: SequencesGetTypes ===
+Getting available sequence types for camera...
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>Token invalid</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>2</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== TEST 2: IsManualRecording ===
+Checking if camera is currently recording...
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>Token invalid</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>2</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== TEST 3: StartRecording ===
+Starting 15-minute manual recording...
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>Token invalid</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>2</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== TEST 4: IsManualRecording (After Starting) ===
+Checking if recording started...
+
+Response:
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>Token invalid</faultstring><detail><ErrorNumber>20001</ErrorNumber><SubErrorNumber>2</SubErrorNumber></detail></soap:Fault></soap:Body></soap:Envelope>
+
+---
+
+=== Testing Complete ===
+
+All tests executed successfully!

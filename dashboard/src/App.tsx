@@ -3,8 +3,9 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import { LiveView } from '@/pages/LiveView';
 import { LiveViewEnhanced } from '@/pages/LiveViewEnhanced';
 import { PlaybackView } from '@/pages/PlaybackView';
+import CameraDiscovery from '@/pages/CameraDiscovery';
 import { Toaster } from 'react-hot-toast';
-import { Video, History, Activity, Settings } from 'lucide-react';
+import { Video, History, Activity, Settings, Camera } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import '@livekit/components-styles';
 
@@ -14,53 +15,14 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const navigation = [
     { name: 'Live View', path: '/', icon: Video },
     { name: 'Playback', path: '/playback', icon: History },
+    { name: 'Discovery', path: '/discovery', icon: Camera },
     { name: 'Analytics', path: '/analytics', icon: Activity },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div className="w-64 bg-gray-900 text-white flex flex-col">
-        {/* Logo */}
-        <div className="p-6 border-b border-gray-800">
-          <h1 className="text-2xl font-bold">RTA CCTV</h1>
-          <p className="text-sm text-gray-400 mt-1">Dashboard</p>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.path;
-            const Icon = item.icon;
-
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-                  isActive
-                    ? 'bg-primary-600 text-white'
-                    : 'text-gray-300 hover:bg-gray-800'
-                )}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="font-medium">{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-800">
-          <p className="text-xs text-gray-500">
-            © 2024 RTA. All rights reserved.
-          </p>
-        </div>
-      </div>
-
-      {/* Main Content */}
+      {/* Main Content - Full Screen */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {children}
       </div>
@@ -76,6 +38,7 @@ function App() {
           <Route path="/" element={<LiveViewEnhanced />} />
           <Route path="/legacy" element={<LiveView />} />
           <Route path="/playback" element={<PlaybackView />} />
+          <Route path="/discovery" element={<CameraDiscovery />} />
           <Route
             path="/analytics"
             element={

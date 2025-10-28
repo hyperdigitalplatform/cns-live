@@ -1,0 +1,332 @@
+# Kong Gateway Routes for Milestone XProtect Integration
+# Add these routes to your main kong.yml configuration
+
+_format_version: "3.0"
+
+services:
+  # ============================================================================
+  # Milestone Camera Discovery Service
+  # ============================================================================
+  - name: milestone-camera-discovery
+    url: http://vms-service:8081
+    routes:
+      - name: list-milestone-cameras
+        paths:
+          - /api/v1/milestone/cameras
+        methods:
+          - GET
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - GET
+                - OPTIONS
+              headers:
+                - Accept
+                - Authorization
+                - Content-Type
+              exposed_headers:
+                - X-Total-Count
+              credentials: true
+              max_age: 3600
+
+      - name: get-milestone-camera
+        paths:
+          - /api/v1/milestone/cameras/(?<camera_id>[^/]+)
+        methods:
+          - GET
+        strip_path: false
+
+      - name: import-camera-from-milestone
+        paths:
+          - /api/v1/cameras/import
+        methods:
+          - POST
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 10
+              policy: local
+
+      - name: bulk-sync-milestone-cameras
+        paths:
+          - /api/v1/milestone/sync-all
+        methods:
+          - POST
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 5
+              policy: local
+
+      - name: sync-camera-with-milestone
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/sync
+        methods:
+          - PUT
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 20
+              policy: local
+
+  # ============================================================================
+  # Milestone Recording Control Service
+  # ============================================================================
+  - name: milestone-recording-control
+    url: http://recording-service:8083
+    routes:
+      - name: start-recording
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/recordings/start
+        methods:
+          - POST
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 10
+              hour: 100
+              policy: local
+          - name: request-size-limiting
+            config:
+              allowed_payload_size: 1
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - POST
+                - OPTIONS
+              credentials: true
+
+      - name: stop-recording
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/recordings/stop
+        methods:
+          - POST
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 20
+              policy: local
+
+      - name: get-recording-status
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/recordings/status
+        methods:
+          - GET
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 120
+              policy: local
+
+      - name: list-active-recordings
+        paths:
+          - /api/v1/recordings/active
+        methods:
+          - GET
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+
+  # ============================================================================
+  # Milestone Playback Service
+  # ============================================================================
+  - name: milestone-playback
+    url: http://playback-service:8084
+    routes:
+      - name: query-recordings
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/recordings/query
+        methods:
+          - POST
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 30
+              policy: local
+          - name: request-size-limiting
+            config:
+              allowed_payload_size: 1
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - POST
+                - OPTIONS
+              credentials: true
+
+      - name: get-timeline-data
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/recordings/timeline
+        methods:
+          - GET
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+
+      - name: start-playback
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/playback/start
+        methods:
+          - POST
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 20
+              policy: local
+
+      - name: playback-stream
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/playback/stream
+        methods:
+          - GET
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 120
+              policy: local
+          - name: response-transformer
+            config:
+              add:
+                headers:
+                  - "Cache-Control: no-cache, no-store, must-revalidate"
+                  - "Pragma: no-cache"
+                  - "Expires: 0"
+
+      - name: get-snapshot
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/playback/snapshot
+        methods:
+          - GET
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 60
+              policy: local
+
+      - name: control-playback
+        paths:
+          - /api/v1/cameras/(?<camera_id>[^/]+)/playback/control
+        methods:
+          - POST
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 120
+              policy: local
+
+# ============================================================================
+# Global Plugins (Optional - Apply to all Milestone routes)
+# ============================================================================
+
+# Authentication Plugin
+# Uncomment and configure based on your authentication method
+# plugins:
+#   - name: jwt
+#     config:
+#       key_claim_name: kid
+#       secret_is_base64: false
+#       claims_to_verify:
+#         - exp
+
+# Request Logging
+# plugins:
+#   - name: file-log
+#     config:
+#       path: /var/log/kong/milestone-requests.log
+#       reopen: true
+
+# Prometheus Metrics
+# plugins:
+#   - name: prometheus
+#     config:
+#       per_consumer: false
+
+# ============================================================================
+# Rate Limiting Strategy
+# ============================================================================
+#
+# Discovery (Low intensity):
+# - List cameras: 60/min
+# - Get camera: No limit (part of list)
+# - Sync all: 5/min (intensive operation)
+#
+# Recording Control (Medium intensity):
+# - Start recording: 10/min, 100/hour (prevent abuse)
+# - Stop recording: 20/min
+# - Status: 120/min (frequent polling)
+#
+# Playback (High intensity):
+# - Query: 30/min
+# - Timeline: 60/min
+# - Stream: 120/min (continuous streaming)
+# - Snapshot: 60/min
+#
+# ============================================================================
+# Security Considerations
+# ============================================================================
+#
+# 1. Add JWT/OAuth authentication for production
+# 2. Enable IP whitelisting for sensitive operations
+# 3. Add request validation plugins
+# 4. Enable detailed logging for audit
+# 5. Configure HTTPS/TLS termination
+# 6. Add WAF (Web Application Firewall) rules
+#
+# ============================================================================
+# Performance Optimization
+# ============================================================================
+#
+# 1. Enable response caching for timeline queries
+# 2. Configure upstream timeouts appropriately
+# 3. Enable HTTP/2 for better multiplexing
+# 4. Add load balancing for high availability
+# 5. Configure circuit breakers for service protection
+#
+# ============================================================================
+
+# Example upstream configuration for load balancing
+# upstreams:
+#   - name: milestone-vms-upstream
+#     algorithm: round-robin
+#     targets:
+#       - target: vms-service-1:8081
+#         weight: 100
+#       - target: vms-service-2:8081
+#         weight: 100
+#     healthchecks:
+#       active:
+#         healthy:
+#           interval: 5
+#           successes: 2
+#         unhealthy:
+#           interval: 5
+#           tcp_failures: 2
+#           http_failures: 3

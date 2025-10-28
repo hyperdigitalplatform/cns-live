@@ -1,0 +1,86 @@
+=== Milestone XProtect WebRTC & Events API Testing ===
+
+1. Authentication - Getting OAuth 2.0 token
+✅ Token obtained (length: 963 chars)
+
+Using Camera ID: a8a8b9dc-3995-49ed-9b00-62caac2ce74a
+
+=== EVENTS API ===
+
+1. GET /api/rest/v1/events - List past events
+
+2. POST /api/rest/v1/events - Trigger new event
+Request Body:
+{
+    "source": {
+        "id": "a8a8b9dc-3995-49ed-9b00-62caac2ce74a",
+        "type": "Camera"
+    },
+    "type": {
+        "id": "UserDefinedEvent"
+    },
+    "message": "Test event from API",
+    "timestamp": "2025-10-27T17:55:36Z"
+}
+
+
+=== WEBRTC API ===
+
+3. POST /webRTC/session - Create WebRTC session (check if endpoint exists)
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1"/>
+<title>404 - File or directory not found.</title>
+<style type="text/css">
+<!--
+body{margin:0;font-size:.7em;font-family:Verdana, Arial, Helvetica, sans-serif;background:#EEEEEE;}
+fieldset{padding:0 15px 10px 15px;} 
+h1{font-size:2.4em;margin:0;color:#FFF;}
+h2{font-size:1.7em;margin:0;color:#CC0000;} 
+h3{font-size:1.2em;margin:10px 0 0 0;color:#000000;} 
+#header{width:96%;margin:0 0 0 0;padding:6px 2% 6px 2%;font-family:"trebuchet MS", Verdana, sans-serif;color:#FFF;
+background-color:#555555;}
+#content{margin:0 0 0 2%;position:relative;}
+.content-container{background:#FFF;width:96%;margin-top:8px;padding:10px;position:relative;}
+-->
+</style>
+</head>
+<body>
+<div id="header"><h1>Server Error</h1></div>
+<div id="content">
+ <div class="content-container"><fieldset>
+  <h2>404 - File or directory not found.</h2>
+  <h3>The resource you are looking for might have been removed, had its name changed, or is temporarily unavailable.</h3>
+ </fieldset></div>
+</div>
+</body>
+</html>
+
+HTTP_STATUS:404
+
+4. POST /api/rest/v1/webRTC/session - Create WebRTC session (alternative path)
+{"sessionId":"7acf1727-5dfa-4fd2-8b47-a9e32d683ec6","cameraId":null,"deviceId":null,"token":null,"resolution":null,"offerSDP":"{\u0022type\u0022:\u0022offer\u0022,\u0022sdp\u0022:\u0022v=0\\r\\no=- 75657 0 IN IP4 127.0.0.1\\r\\ns=sipsorcery\\r\\nt=0 0\\r\\na=group:BUNDLE 0 1\\r\\nm=video 9 UDP/TLS/RTP/SAVP 104\\r\\nc=IN IP4 0.0.0.0\\r\\na=ice-ufrag:CIKJ\\r\\na=ice-pwd:AXVJQVBUIBSYEZHFOICNQOZT\\r\\na=fingerprint:sha-256 66:23:ED:04:7B:00:07:54:76:77:AE:1C:4C:B3:C3:3E:C2:FB:88:39:E9:C6:8D:D6:FA:70:FC:67:FF:8B:39:5F\\r\\na=setup:actpass\\r\\na=candidate:2108781580 1 udp 2113937663 192.168.1.11 49766 typ host generation 0\\r\\na=candidate:2733486262 1 udp 2113940223 2401:4900:1c44:17af:bd73:6788:fd2c:c10e 49766 typ host generation 0\\r\\na=candidate:235467802 1 udp 2113940223 2401:4900:1c44:17af:b033:9572:d393:4cb0 49766 typ host generation 0\\r\\na=ice-options:ice2,trickle\\r\\na=mid:0\\r\\na=rtpmap:104 H265/90000\\r\\na=rtcp-fb:104 transport-cc\\r\\na=fmtp:104 level-id=93;profile-id=1;tier-flag=0;tx-mode=SRST\\r\\na=rtcp-mux\\r\\na=rtcp:9 IN IP4 0.0.0.0\\r\\na=end-of-candidates\\r\\na=sendonly\\r\\na=ssrc:1215188135 cname:6abd1808-3328-4dd8-a672-c9a488b0bdbe\\r\\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\\r\\nc=IN IP4 0.0.0.0\\r\\na=ice-ufrag:CIKJ\\r\\na=ice-pwd:AXVJQVBUIBSYEZHFOICNQOZT\\r\\na=fingerprint:sha-256 66:23:ED:04:7B:00:07:54:76:77:AE:1C:4C:B3:C3:3E:C2:FB:88:39:E9:C6:8D:D6:FA:70:FC:67:FF:8B:39:5F\\r\\na=setup:actpass\\r\\na=ice-options:ice2,trickle\\r\\na=mid:1\\r\\na=sctp-port:5000\\r\\na=max-message-size:262144\\r\\n\u0022}","answerSDP":"Uninitialised","streamId":null,"playbackTimeNode":{"playbackTime":null,"skipGaps":null,"speed":null},"iceServers":[],"includeAudio":true}
+HTTP_STATUS:200
+
+=== BOOKMARKS API ===
+
+5. POST /api/rest/v1/bookmarks - Create bookmark
+Request Body:
+{
+    "header": "Test Recording",
+    "description": "API test recording bookmark",
+    "timeBegin": "2025-10-27T17:45:38Z",
+    "timeEnd": "2025-10-27T17:55:38Z",
+    "reference": "TEST-1761587738",
+    "deviceId": "a8a8b9dc-3995-49ed-9b00-62caac2ce74a"
+}
+
+
+6. POST /api/rest/v1/bookmarks?task=searchTime - Search bookmarks
+
+=== ALARMS API ===
+
+7. GET /api/rest/v1/alarms - List alarms
+
+=== Testing Complete ===

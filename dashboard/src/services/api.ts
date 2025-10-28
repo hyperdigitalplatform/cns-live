@@ -13,6 +13,16 @@ import type {
   UpdateLayoutRequest,
   LayoutType,
   LayoutScope,
+  MilestoneRecordingRequest,
+  MilestoneRecordingStatusResponse,
+  MilestoneSequenceTypesResponse,
+  MilestoneSequencesRequest,
+  MilestoneSequencesResponse,
+  MilestoneTimelineRequest,
+  MilestoneTimelineResponse,
+  CameraDiscoveryResponse,
+  ImportCamerasRequest,
+  ImportCamerasResponse,
 } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -70,6 +80,12 @@ class APIClient {
 
   async getCamera(cameraId: string): Promise<Camera> {
     return this.request(`/api/v1/cameras/${cameraId}`);
+  }
+
+  async deleteCamera(cameraId: string): Promise<void> {
+    return this.request(`/api/v1/cameras/${cameraId}`, {
+      method: 'DELETE',
+    });
   }
 
   async controlPTZ(
@@ -174,6 +190,69 @@ class APIClient {
   async deleteLayout(layoutId: string): Promise<void> {
     await this.request(`/api/v1/layouts/${layoutId}`, {
       method: 'DELETE',
+    });
+  }
+
+  // Milestone Recording Control endpoints
+  async startMilestoneRecording(
+    request: MilestoneRecordingRequest
+  ): Promise<{ status: string; message: string }> {
+    return this.request('/api/v1/milestone/recordings/start', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async stopMilestoneRecording(
+    cameraId: string
+  ): Promise<{ status: string; message: string }> {
+    return this.request('/api/v1/milestone/recordings/stop', {
+      method: 'POST',
+      body: JSON.stringify({ cameraId }),
+    });
+  }
+
+  async getMilestoneRecordingStatus(
+    cameraId: string
+  ): Promise<MilestoneRecordingStatusResponse> {
+    return this.request(`/api/v1/milestone/recordings/status/${cameraId}`);
+  }
+
+  async getMilestoneSequenceTypes(
+    cameraId: string
+  ): Promise<MilestoneSequenceTypesResponse> {
+    return this.request(`/api/v1/milestone/sequences/types/${cameraId}`);
+  }
+
+  async getMilestoneSequences(
+    request: MilestoneSequencesRequest
+  ): Promise<MilestoneSequencesResponse> {
+    return this.request('/api/v1/milestone/sequences', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async getMilestoneTimeline(
+    request: MilestoneTimelineRequest
+  ): Promise<MilestoneTimelineResponse> {
+    return this.request('/api/v1/milestone/timeline', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  // Camera Discovery endpoints
+  async discoverCameras(): Promise<CameraDiscoveryResponse> {
+    return this.request('/api/v1/milestone/cameras/discover');
+  }
+
+  async importCameras(
+    request: ImportCamerasRequest
+  ): Promise<ImportCamerasResponse> {
+    return this.request('/api/v1/cameras/import', {
+      method: 'POST',
+      body: JSON.stringify(request),
     });
   }
 }

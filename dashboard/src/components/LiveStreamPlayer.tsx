@@ -9,6 +9,7 @@ import { Track } from 'livekit-client';
 import type { Camera, StreamReservation } from '@/types';
 import { useStreamStore } from '@/stores/streamStore';
 import { PTZControls } from './PTZControls';
+import { RecordingsPanel } from './RecordingsPanel';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 // Module-level map to track reservations in progress (persists across React.StrictMode remounts)
@@ -32,6 +33,7 @@ export function LiveStreamPlayer({
   const [error, setError] = useState<string | null>(null);
   const [showPTZ, setShowPTZ] = useState(false);
   const [ptzPinned, setPTZPinned] = useState(false);
+  const [showRecordings, setShowRecordings] = useState(false);
   const reserveStream = useStreamStore((state) => state.reserveStream);
   const releaseStream = useStreamStore((state) => state.releaseStream);
 
@@ -119,23 +121,33 @@ export function LiveStreamPlayer({
   };
 
   return (
-    <LiveKitRoom
-      serverUrl={reservation.livekit_url}
-      token={reservation.token}
-      connect={true}
-      audio={false}
-      video={false} // Don't publish - we only subscribe to camera streams
-      className="h-full"
-    >
-      <LiveStreamView
-        camera={camera}
-        showPTZ={showPTZ}
-        ptzPinned={ptzPinned}
-        onShowPTZ={setShowPTZ}
-        onPTZClick={handlePTZClick}
-        onTogglePin={handleTogglePin}
-      />
-    </LiveKitRoom>
+    <>
+      <LiveKitRoom
+        serverUrl={reservation.livekit_url}
+        token={reservation.token}
+        connect={true}
+        audio={false}
+        video={false} // Don't publish - we only subscribe to camera streams
+        className="h-full"
+      >
+        <LiveStreamView
+          camera={camera}
+          showPTZ={showPTZ}
+          ptzPinned={ptzPinned}
+          onShowPTZ={setShowPTZ}
+          onPTZClick={handlePTZClick}
+          onTogglePin={handleTogglePin}
+          onViewRecordings={() => setShowRecordings(true)}
+        />
+      </LiveKitRoom>
+
+      {showRecordings && (
+        <RecordingsPanel
+          camera={camera}
+          onClose={() => setShowRecordings(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -146,6 +158,7 @@ function LiveStreamView({
   onShowPTZ,
   onPTZClick,
   onTogglePin,
+  onViewRecordings,
 }: {
   camera: Camera;
   showPTZ: boolean;
@@ -153,9 +166,11 @@ function LiveStreamView({
   onShowPTZ: (show: boolean) => void;
   onPTZClick: () => void;
   onTogglePin: () => void;
+  onViewRecordings: () => void;
 }) {
   const room = useRoomContext();
   const tracks = useTracks([Track.Source.Camera]);
+  const [isRecording, setIsRecording] = useState(false);
 
   if (tracks.length === 0) {
     return (
@@ -202,6 +217,7 @@ function LiveStreamView({
       {/* Stream info overlay */}
       <div className="absolute bottom-2 right-2 bg-black/70 px-3 py-1 rounded text-xs text-white">
         <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-1 animate-pulse" />
+        {isRecording && <span className="font-semibold">RECORDING </span>}
         LIVE
       </div>
 
@@ -220,6 +236,9 @@ function LiveStreamView({
           camera={camera}
           onTogglePin={onTogglePin}
           isPinned={ptzPinned}
+          isRecording={isRecording}
+          onRecordingChange={setIsRecording}
+          onViewRecordings={onViewRecordings}
         />
       )}
     </div>

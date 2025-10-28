@@ -163,7 +163,7 @@ export function DialogFooter({ children, className }: DialogFooterProps) {
 }
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'danger' | 'warning' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
 }
@@ -185,6 +185,8 @@ export function Button({
       'bg-white text-gray-900 border border-gray-300 hover:bg-gray-50 focus-visible:ring-gray-400',
     danger:
       'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-600',
+    warning:
+      'bg-orange-600 text-white hover:bg-orange-700 focus-visible:ring-orange-600',
     ghost: 'text-gray-700 hover:bg-gray-100 focus-visible:ring-gray-400',
   };
 

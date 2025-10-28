@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,17 +12,27 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// CameraUsecase defines the interface for camera business logic
+type CameraUsecase interface {
+	ImportCameras(ctx context.Context, req domain.ImportCamerasRequest) (*domain.ImportCamerasResponse, error)
+	GetCamera(ctx context.Context, id string) (*domain.Camera, error)
+	ListCameras(ctx context.Context, query domain.CameraQuery) ([]*domain.Camera, error)
+	DeleteCamera(ctx context.Context, id string) error
+}
+
 // CameraHandler handles camera-related HTTP requests
 type CameraHandler struct {
-	vmsClient *client.VMSClient
-	logger    zerolog.Logger
+	vmsClient     *client.VMSClient
+	cameraUsecase CameraUsecase
+	logger        zerolog.Logger
 }
 
 // NewCameraHandler creates a new camera handler
-func NewCameraHandler(vmsClient *client.VMSClient, logger zerolog.Logger) *CameraHandler {
+func NewCameraHandler(vmsClient *client.VMSClient, cameraUsecase CameraUsecase, logger zerolog.Logger) *CameraHandler {
 	return &CameraHandler{
-		vmsClient: vmsClient,
-		logger:    logger,
+		vmsClient:     vmsClient,
+		cameraUsecase: cameraUsecase,
+		logger:        logger,
 	}
 }
 
@@ -46,7 +57,7 @@ func (h *CameraHandler) ListCameras(w http.ResponseWriter, r *http.Request) {
 		fmt.Sscanf(offset, "%d", &query.Offset)
 	}
 
-	cameras, err := h.vmsClient.ListCameras(r.Context(), query)
+	cameras, err := h.cameraUsecase.ListCameras(r.Context(), query)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("Failed to list cameras")
 		h.respondError(w, http.StatusInternalServerError, "Failed to list cameras")
@@ -77,6 +88,27 @@ func (h *CameraHandler) GetCamera(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.respondJSON(w, http.StatusOK, camera)
+}
+
+// DeleteCamera handles camera deletion request
+// DELETE /api/v1/cameras/{id}
+func (h *CameraHandler) DeleteCamera(w http.ResponseWriter, r *http.Request) {
+	cameraID := chi.URLParam(r, "id")
+
+	if cameraID == "" {
+		h.respondError(w, http.StatusBadRequest, "camera_id is required")
+		return
+	}
+
+	err := h.cameraUsecase.DeleteCamera(r.Context(), cameraID)
+	if err != nil {
+		h.logger.Error().Err(err).Str("camera_id", cameraID).Msg("Failed to delete camera")
+		h.respondError(w, http.StatusInternalServerError, "Failed to delete camera")
+		return
+	}
+
+	h.logger.Info().Str("camera_id", cameraID).Msg("Camera deleted successfully")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ControlPTZ handles PTZ control request
@@ -121,6 +153,41 @@ func (h *CameraHandler) ControlPTZ(w http.ResponseWriter, r *http.Request) {
 		"status":  "success",
 		"message": "PTZ command executed",
 	})
+}
+
+// ImportCameras handles camera import request
+// POST /api/v1/cameras/import
+func (h *CameraHandler) ImportCameras(w http.ResponseWriter, r *http.Request) {
+	var req domain.ImportCamerasRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate request
+	if len(req.Cameras) == 0 {
+		h.respondError(w, http.StatusBadRequest, "No cameras to import")
+		return
+	}
+
+	h.logger.Info().
+		Int("count", len(req.Cameras)).
+		Msg("Importing cameras")
+
+	response, err := h.cameraUsecase.ImportCameras(r.Context(), req)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to import cameras")
+		h.respondError(w, http.StatusInternalServerError, "Failed to import cameras")
+		return
+	}
+
+	// Return success even if some cameras failed
+	statusCode := http.StatusOK
+	if response.Failed > 0 && response.Imported == 0 {
+		statusCode = http.StatusBadRequest
+	}
+
+	h.respondJSON(w, statusCode, response)
 }
 
 // Helper methods

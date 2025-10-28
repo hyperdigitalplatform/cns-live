@@ -55,6 +55,7 @@ func main() {
 	// Initialize repositories
 	streamRepo := valkey.NewStreamRepository(valkeyClient, logger)
 	layoutRepo := postgres.NewLayoutRepository(db, logger)
+	cameraRepo := postgres.NewCameraRepository(db)
 
 	// Initialize clients
 	streamCounterClient := client.NewStreamCounterClient(config.StreamCounterURL, logger)
@@ -93,6 +94,7 @@ func main() {
 		logger,
 	)
 	layoutUseCase := usecase.NewLayoutUseCase(layoutRepo, logger)
+	cameraUseCase := usecase.NewCameraUsecase(cameraRepo, logger)
 
 	// Initialize WebSocket hub
 	wsHub := deliveryWS.NewHub(streamUseCase, logger)
@@ -100,7 +102,7 @@ func main() {
 
 	// Initialize HTTP handlers
 	streamHandler := deliveryHttp.NewStreamHandler(streamUseCase, logger)
-	cameraHandler := deliveryHttp.NewCameraHandler(vmsClient, logger)
+	cameraHandler := deliveryHttp.NewCameraHandler(vmsClient, cameraUseCase, logger)
 	wsHandler := deliveryWS.NewHandler(wsHub, logger)
 	layoutHandler := deliveryHttp.NewLayoutHandler(layoutUseCase, logger)
 

@@ -67,7 +67,9 @@ func NewRouter(
 		// Camera management
 		r.Route("/cameras", func(r chi.Router) {
 			r.Get("/", cameraHandler.ListCameras)
+			r.Post("/import", cameraHandler.ImportCameras)
 			r.Get("/{id}", cameraHandler.GetCamera)
+			r.Delete("/{id}", cameraHandler.DeleteCamera)
 			r.Post("/{id}/ptz", cameraHandler.ControlPTZ)
 		})
 

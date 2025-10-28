@@ -10,7 +10,7 @@ import (
 )
 
 // NewRouter creates a new HTTP router with all routes
-func NewRouter(handler *Handler) *chi.Mux {
+func NewRouter(handler *Handler, milestoneHandler *MilestoneHandler) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Middleware
@@ -52,6 +52,7 @@ func NewRouter(handler *Handler) *chi.Mux {
 			r.Post("/export", handler.ExportRecording)                   // POST /vms/recordings/export
 			r.Get("/export/{export_id}", handler.GetExportStatus)        // GET /vms/recordings/export/{export_id}
 		})
+
 	})
 
 	return r

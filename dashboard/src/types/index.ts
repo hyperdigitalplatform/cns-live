@@ -8,6 +8,7 @@ export interface Camera {
   status: CameraStatus;
   ptz_enabled: boolean;
   recording_server?: string;
+  milestone_device_id?: string; // Milestone XProtect device ID
   metadata?: Record<string, unknown>;
   location?: CameraLocation;
   created_at: string;
@@ -20,9 +21,83 @@ export type CameraSource =
   | 'ABU_DHABI_POLICE'
   | 'METRO'
   | 'TAXI'
-  | 'PARKING';
+  | 'PARKING'
+  | 'OTHER';
 
 export type CameraStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE' | 'ERROR';
+
+// Discovery types
+export interface DiscoveredCamera {
+  milestoneId: string;
+  name: string;
+  displayName: string;
+  enabled: boolean;
+  status: string;
+  ptzEnabled: boolean;
+  recordingEnabled: boolean;
+  shortName: string;
+  device: DeviceInfo;
+  onvifEndpoint: string;
+  onvifUsername: string;
+  streams: StreamProfile[];
+  ptzCapabilities: PtzCapabilities;
+}
+
+export interface DeviceInfo {
+  ip: string;
+  port: number;
+  manufacturer: string;
+  model: string;
+  firmwareVersion: string;
+  serialNumber: string;
+  hardwareId: string;
+}
+
+export interface StreamProfile {
+  profileToken: string;
+  name: string;
+  encoding: string;
+  resolution: string;
+  width: number;
+  height: number;
+  frameRate: number;
+  bitrate: number;
+  rtspUrl: string;
+}
+
+export interface PtzCapabilities {
+  pan: boolean;
+  tilt: boolean;
+  zoom: boolean;
+}
+
+export interface CameraDiscoveryResponse {
+  cameras: DiscoveredCamera[];
+  total: number;
+}
+
+export interface ImportCameraRequest {
+  milestoneId: string;
+  name: string;
+  source: CameraSource;
+  status: CameraStatus;
+  ptzEnabled: boolean;
+  device: DeviceInfo;
+  onvifEndpoint: string;
+  onvifUsername: string;
+  streams: StreamProfile[];
+  ptzCapabilities: PtzCapabilities;
+}
+
+export interface ImportCamerasRequest {
+  cameras: ImportCameraRequest[];
+}
+
+export interface ImportCamerasResponse {
+  imported: number;
+  failed: number;
+  errors?: string[];
+}
 
 export interface CameraLocation {
   latitude: number;
@@ -67,6 +142,60 @@ export interface CameraStreamStats {
   viewer_count: number;
   source: string;
   active_since: string;
+}
+
+// Milestone Recording types
+export interface MilestoneRecordingRequest {
+  cameraId: string;
+  durationMinutes?: number; // Default 15 if not specified
+}
+
+export interface MilestoneRecordingStatusResponse {
+  cameraId: string;
+  isRecording: boolean;
+}
+
+export interface MilestoneSequenceType {
+  id: string;
+  name: string;
+}
+
+export interface MilestoneSequenceTypesResponse {
+  cameraId: string;
+  types: MilestoneSequenceType[];
+}
+
+export interface MilestoneSequenceEntry {
+  timeBegin: string;
+  timeTrigged: string;
+  timeEnd: string;
+}
+
+export interface MilestoneSequencesRequest {
+  cameraId: string;
+  startTime: string; // ISO 8601 format
+  endTime: string;   // ISO 8601 format
+  sequenceTypes?: string[];
+}
+
+export interface MilestoneSequencesResponse {
+  cameraId: string;
+  sequences: MilestoneSequenceEntry[];
+}
+
+export interface MilestoneTimelineRequest {
+  cameraId: string;
+  startTime: string; // ISO 8601 format
+  endTime: string;   // ISO 8601 format
+  sequenceType?: string;
+}
+
+export interface MilestoneTimelineResponse {
+  cameraId: string;
+  timeline: {
+    count: number;
+    data: string; // Base64 encoded bitmap
+  };
 }
 
 // Playback types

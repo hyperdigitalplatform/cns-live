@@ -93,11 +93,20 @@ func main() {
 		logger,
 	)
 
+	// Initialize milestone playback use case
+	milestonePlaybackUseCase := usecase.NewMilestonePlaybackUsecase(
+		milestoneClient,
+		logger,
+	)
+
+	// Initialize milestone playback handler
+	milestonePlaybackHandler := deliveryHttp.NewMilestonePlaybackHandler(milestonePlaybackUseCase, logger)
+
 	// Initialize HTTP handler
 	playbackHandler := deliveryHttp.NewPlaybackHandler(playbackUseCase, logger)
 
 	// Setup router
-	router := deliveryHttp.NewRouter(playbackHandler)
+	router := deliveryHttp.NewRouter(playbackHandler, milestonePlaybackHandler)
 
 	// Start HTTP server
 	srv := &http.Server{

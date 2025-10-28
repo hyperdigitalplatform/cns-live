@@ -3,10 +3,22 @@ import { LiveStreamPlayer } from './LiveStreamPlayer';
 import { SaveLayoutDialog } from './SaveLayoutDialog';
 import { LoadLayoutDropdown } from './LoadLayoutDropdown';
 import { LayoutManagerDialog } from './LayoutManagerDialog';
+import { ToastContainer } from './Toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogFooter,
+  Button,
+} from './ui/Dialog';
 import type { Camera, DragItem, LayoutType, LayoutPreferenceSummary } from '@/types';
-import { Grid, Maximize2, X, Plus, Trash2, Save, Settings } from 'lucide-react';
+import { Grid, Maximize2, X, Plus, Trash2, Save, Settings, AlertTriangle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
+import { useToast } from '@/hooks/useToast';
 
 export interface StreamGridEnhancedRef {
   addCameraToNextAvailableCell: (camera: Camera) => boolean;
@@ -120,6 +132,8 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const [showSaveDialog, setShowSaveDialog] = useState(false);
     const [showManageDialog, setShowManageDialog] = useState(false);
+    const [showClearAllDialog, setShowClearAllDialog] = useState(false);
+    const { toasts, removeToast, error: showError, warning: showWarning } = useToast();
 
     const layoutConfig = GRID_LAYOUTS[layout];
     const { cols, rows, isHotspot, totalCameras } = layoutConfig;
@@ -257,16 +271,19 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const clearAllCells = () => {
-    if (confirm('Clear all cameras from grid?')) {
-      setGridCells((prev) =>
-        prev.map((cell) => ({
-          ...cell,
-          camera: null,
-          loading: false
-        }))
-      );
-    }
+  const handleClearAllClick = () => {
+    setShowClearAllDialog(true);
+  };
+
+  const handleConfirmClearAll = () => {
+    setGridCells((prev) =>
+      prev.map((cell) => ({
+        ...cell,
+        camera: null,
+        loading: false
+      }))
+    );
+    setShowClearAllDialog(false);
   };
 
   const activeCameras = gridCells.filter((cell) => cell.camera !== null).length;
@@ -312,7 +329,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
       const fullLayout = await api.getLayout(layoutSummary.id);
 
       if (!fullLayout.cameras || fullLayout.cameras.length === 0) {
-        alert('This layout has no cameras saved.');
+        showWarning('This layout has no cameras saved.');
         return;
       }
 
@@ -375,7 +392,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
       }
     } catch (error) {
       console.error('Failed to load layout:', error);
-      alert('Failed to load layout. Please try again.');
+      showError('Failed to load layout. Please try again.');
     }
   };
 
@@ -496,7 +513,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
 
             {activeCameras > 0 && (
               <button
-                onClick={clearAllCells}
+                onClick={handleClearAllClick}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
@@ -611,32 +628,51 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
         </div>
       </div>
 
-      {/* Help text */}
-      {activeCameras === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-white/95 rounded-xl shadow-xl p-8 max-w-md text-center">
-            <Grid className="w-16 h-16 mx-auto mb-4 text-blue-600" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No Cameras in Grid
-            </h3>
-            <p className="text-gray-600 text-sm mb-4">
-              Drag cameras from the sidebar and drop them into grid cells, or
-              double-click a camera in the sidebar to auto-assign it to the next
-              available cell.
-            </p>
-            <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-500 rounded" />
-                <span>Drag & Drop</span>
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* Clear All Confirmation Dialog */}
+      <Dialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
+        <DialogContent onClose={() => setShowClearAllDialog(false)}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Clear All Cameras?
+            </DialogTitle>
+            <DialogDescription>
+              This will remove all cameras from the grid. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogBody>
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800">
+                  <strong>Warning:</strong> You are about to clear <strong>{activeCameras} camera{activeCameras !== 1 ? 's' : ''}</strong> from the grid.
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded" />
-                <span>Double-click</span>
-              </div>
+              <p className="text-sm text-gray-600">
+                The cameras will remain in your camera list and can be added back to the grid at any time.
+              </p>
             </div>
-          </div>
-        </div>
-      )}
+          </DialogBody>
+
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setShowClearAllDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleConfirmClearAll}
+            >
+              Clear All Cameras
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Layout Dialogs */}
       <SaveLayoutDialog

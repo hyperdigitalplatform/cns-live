@@ -17,6 +17,10 @@ import {
 import { cn } from '@/utils/cn';
 import type { CameraFolderTree, Camera, DragItem } from '@/types';
 import { useFolderStore } from '@/stores/folderStore';
+import { useCameraStore } from '@/stores/cameraStore';
+import { api } from '@/services/api';
+import { useToast } from '@/hooks/useToast';
+import { ToastContainer } from './Toast';
 import {
   Dialog,
   DialogContent,
@@ -63,6 +67,9 @@ export function CameraTreeView({
     addCameraToFolder,
   } = useFolderStore();
 
+  const { fetchCameras } = useCameraStore();
+  const { toasts, removeToast, error: showError } = useToast();
+
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -79,7 +86,13 @@ export function CameraTreeView({
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAddCameraDialog, setShowAddCameraDialog] = useState(false);
+  const [showDeleteCameraDialog, setShowDeleteCameraDialog] = useState(false);
+  const [showRemoveCameraDialog, setShowRemoveCameraDialog] = useState(false);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentCameraId, setCurrentCameraId] = useState<string | null>(null);
+  const [currentCameraName, setCurrentCameraName] = useState('');
+  const [removeCameraFolderId, setRemoveCameraFolderId] = useState<string | null>(null);
+  const [deletingCamera, setDeletingCamera] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [folderNameAr, setFolderNameAr] = useState('');
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
@@ -265,11 +278,48 @@ export function CameraTreeView({
     return null;
   };
 
-  const handleRemoveCamera = (cameraId: string, folderId: string) => {
-    if (confirm('Remove camera from this folder?')) {
-      removeCameraFromFolder(cameraId, folderId);
-    }
+  const handleRemoveCamera = (cameraId: string, folderId: string, cameraName: string) => {
+    setCurrentCameraId(cameraId);
+    setCurrentCameraName(cameraName);
+    setRemoveCameraFolderId(folderId);
+    setShowRemoveCameraDialog(true);
     setContextMenu(null);
+  };
+
+  const handleConfirmRemoveCamera = () => {
+    if (currentCameraId && removeCameraFolderId) {
+      removeCameraFromFolder(currentCameraId, removeCameraFolderId);
+      setShowRemoveCameraDialog(false);
+      setCurrentCameraId(null);
+      setCurrentCameraName('');
+      setRemoveCameraFolderId(null);
+    }
+  };
+
+  const handleDeleteCamera = (cameraId: string, cameraName: string) => {
+    setCurrentCameraId(cameraId);
+    setCurrentCameraName(cameraName);
+    setShowDeleteCameraDialog(true);
+    setContextMenu(null);
+  };
+
+  const handleConfirmDeleteCamera = async () => {
+    if (!currentCameraId) return;
+
+    setDeletingCamera(true);
+    try {
+      await api.deleteCamera(currentCameraId);
+      // Refresh camera list
+      await fetchCameras();
+      setShowDeleteCameraDialog(false);
+      setCurrentCameraId(null);
+      setCurrentCameraName('');
+    } catch (error) {
+      console.error('Failed to delete camera:', error);
+      showError('Failed to delete camera. Please try again.');
+    } finally {
+      setDeletingCamera(false);
+    }
   };
 
   const handleSaveEdit = (folderId: string) => {
@@ -475,8 +525,12 @@ export function CameraTreeView({
   }, [contextMenu]);
 
   return (
-    <div className="space-y-1">
-      {folderTrees.map((tree) => renderFolder(tree))}
+    <>
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      <div className="space-y-1">
+        {folderTrees.map((tree) => renderFolder(tree))}
 
       {/* Unorganized cameras section - Now part of tree */}
       {unorganizedCameras.length > 0 && (
@@ -575,15 +629,30 @@ export function CameraTreeView({
             <>
               {contextMenu.folderId && (
                 <button
-                  onClick={() =>
-                    handleRemoveCamera(contextMenu.id, contextMenu.folderId!)
-                  }
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                  onClick={() => {
+                    const camera = allCameras.find(c => c.id === contextMenu.id);
+                    if (camera) {
+                      handleRemoveCamera(contextMenu.id, contextMenu.folderId!, camera.name);
+                    }
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-orange-600"
                 >
                   <Trash2 className="w-4 h-4" />
                   Remove from Folder
                 </button>
               )}
+              <button
+                onClick={() => {
+                  const camera = allCameras.find(c => c.id === contextMenu.id);
+                  if (camera) {
+                    handleDeleteCamera(camera.id, camera.name);
+                  }
+                }}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-600"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Camera
+              </button>
             </>
           )}
         </div>
@@ -739,6 +808,120 @@ export function CameraTreeView({
         </DialogContent>
       </Dialog>
 
+      {/* Delete Camera Dialog */}
+      <Dialog open={showDeleteCameraDialog} onOpenChange={setShowDeleteCameraDialog}>
+        <DialogContent onClose={() => setShowDeleteCameraDialog(false)}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Delete Camera
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The camera will be permanently removed from the system.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogBody>
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800">
+                  <strong>Warning:</strong> You are about to permanently delete the camera <strong>"{currentCameraName}"</strong> and all its associated data.
+                </p>
+              </div>
+              <p className="text-sm text-gray-600">
+                This will remove:
+              </p>
+              <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
+                <li>Camera configuration and settings</li>
+                <li>All associated stream data</li>
+                <li>Camera from all folders</li>
+              </ul>
+            </div>
+          </DialogBody>
+
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowDeleteCameraDialog(false);
+                setCurrentCameraId(null);
+                setCurrentCameraName('');
+              }}
+              disabled={deletingCamera}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleConfirmDeleteCamera}
+              disabled={deletingCamera}
+            >
+              {deletingCamera ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                <>Delete Camera</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Camera from Folder Dialog */}
+      <Dialog open={showRemoveCameraDialog} onOpenChange={setShowRemoveCameraDialog}>
+        <DialogContent onClose={() => setShowRemoveCameraDialog(false)}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="w-5 h-5" />
+              Remove Camera from Folder?
+            </DialogTitle>
+            <DialogDescription>
+              This will only remove the camera from this folder. The camera will remain in your system.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogBody>
+            <div className="space-y-4">
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <p className="text-sm text-orange-800">
+                  Remove <strong>"{currentCameraName}"</strong> from this folder?
+                </p>
+              </div>
+              <p className="text-sm text-gray-600">
+                The camera will still be accessible from:
+              </p>
+              <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
+                <li>Other folders it belongs to</li>
+                <li>The unorganized cameras section</li>
+                <li>The camera list</li>
+              </ul>
+            </div>
+          </DialogBody>
+
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowRemoveCameraDialog(false);
+                setCurrentCameraId(null);
+                setCurrentCameraName('');
+                setRemoveCameraFolderId(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="warning"
+              onClick={handleConfirmRemoveCamera}
+            >
+              Remove from Folder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Camera Dialog */}
       <Dialog open={showAddCameraDialog} onOpenChange={setShowAddCameraDialog}>
         <DialogContent onClose={() => setShowAddCameraDialog(false)}>
@@ -841,5 +1024,6 @@ export function CameraTreeView({
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }
