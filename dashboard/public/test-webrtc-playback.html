@@ -1322,9 +1322,9 @@
             const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
             const zoomMs = currentZoom.hours * 60 * 60 * 1000; // hours to ms
 
-            // Use exactly the zoom range (no buffer)
-            timelineStartTime = new Date(center.getTime() - zoomMs / 2);
-            timelineEndTime = new Date(center.getTime() + zoomMs / 2);
+            // Use 3x buffer range for smooth CSS scrolling (1.5x on each side)
+            timelineStartTime = new Date(center.getTime() - (zoomMs * 1.5));
+            timelineEndTime = new Date(center.getTime() + (zoomMs * 1.5));
 
             // Update center time and display
             centerTime = center;
@@ -1342,7 +1342,8 @@
             // Update future zone overlay
             updateFutureZone();
 
-            // Reset scroll offset (no scrolling needed, timeline centered on target)
+            // Initialize CSS transform: center time is at middle of 3x buffer, which is at 50% of content width
+            // We want it to appear at 50% of viewport, so no offset needed initially (they align)
             const wrapper = document.getElementById('timelineContentWrapper');
             if (wrapper) {
                 wrapper.style.transition = 'none';
@@ -1351,11 +1352,11 @@
             }
         }
 
-        // Update timeline to center on a specific time (reloads if needed)
-        function updateTimelineCenter(targetTime) {
+        // Smoothly scroll timeline using CSS transforms (YouTube-style)
+        function updateTimelineScroll(currentTime) {
             if (!timelineStartTime || !timelineEndTime) return;
 
-            let target = new Date(targetTime);
+            let target = new Date(currentTime);
 
             // BOUNDARY CONSTRAINT: Cannot go into future
             const now = new Date();
@@ -1363,22 +1364,44 @@
                 target = now;
             }
 
-            // Check if target is within current range (with 2% margin for very smooth scrolling)
+            // Check if target is outside the 3x buffer range (need to reload)
             const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
             const zoomMs = currentZoom.hours * 60 * 60 * 1000;
-            const margin = zoomMs * 0.02; // 2% margin - reloads very frequently for smooth appearance
+            const bufferMargin = zoomMs * 0.3; // 30% margin before reloading (0.3 of 1.5x = 20% of total buffer)
 
-            const isInRange = target >= new Date(timelineStartTime.getTime() + margin) &&
-                             target <= new Date(timelineEndTime.getTime() - margin);
+            const isInBuffer = target >= new Date(timelineStartTime.getTime() + bufferMargin) &&
+                              target <= new Date(timelineEndTime.getTime() - bufferMargin);
 
-            if (!isInRange) {
-                // Target is outside range, reload timeline centered on target
-                setupTimeline(target.toISOString());
-            } else {
-                // Target is in range, just update the display
-                centerTime = target;
-                updateCurrentTimeDisplay(target);
+            if (!isInBuffer) {
+                // Target is outside buffer, reload timeline centered on target
+                console.log('Reloading timeline - outside buffer');
+                setupTimeline(target.toISOString(), false);
+                return;
             }
+
+            // Calculate smooth CSS transform scroll
+            const wrapper = document.getElementById('timelineContentWrapper');
+            if (!wrapper) return;
+
+            const totalDuration = timelineEndTime - timelineStartTime;
+            const elapsed = target - timelineStartTime;
+            const percentComplete = elapsed / totalDuration;
+
+            // Calculate offset: we want the target time to appear at center (50%) of viewport
+            // Since we have 3x buffer, we need to shift content so target aligns with center
+            const containerWidth = wrapper.offsetWidth;
+            const targetPixelPosition = percentComplete * containerWidth;
+            const centerPixelPosition = containerWidth / 2;
+            const scrollOffset = centerPixelPosition - targetPixelPosition;
+
+            // Apply smooth CSS transform
+            wrapper.style.transition = 'transform 0.05s linear';
+            wrapper.style.transform = `translateX(${scrollOffset}px)`;
+            timelineScrollOffset = scrollOffset;
+
+            // Update center time and display
+            centerTime = target;
+            updateCurrentTimeDisplay(target);
         }
 
         // Track zoom direction for animations
@@ -1427,16 +1450,26 @@
                 });
             }
 
-            // Generate new labels immediately
+            // Generate new labels for VISIBLE 1x range only (not entire 3x buffer)
             const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
             const interval = currentZoom.interval;
-            const totalDuration = timelineEndTime - timelineStartTime;
-            const numLabels = Math.floor(totalDuration / interval) + 1;
+            const zoomMs = currentZoom.hours * 60 * 60 * 1000;
+
+            // Calculate visible 1x range
+            const visibleStart = new Date(centerTime.getTime() - zoomMs / 2);
+            const visibleEnd = new Date(centerTime.getTime() + zoomMs / 2);
+            const totalDuration = timelineEndTime - timelineStartTime; // 3x buffer for positioning
+
+            const visibleDuration = visibleEnd - visibleStart;
+            const numLabels = Math.floor(visibleDuration / interval) + 1;
+
+            // Find the first label time within visible range
+            const firstLabelTime = new Date(Math.ceil(visibleStart.getTime() / interval) * interval);
 
             for (let i = 0; i < numLabels; i++) {
-                const time = new Date(timelineStartTime.getTime() + (i * interval));
+                const time = new Date(firstLabelTime.getTime() + (i * interval));
 
-                if (time <= timelineEndTime) {
+                if (time >= visibleStart && time <= visibleEnd) {
                     const span = document.createElement('span');
                     span.textContent = formatTimeLabel(time, currentZoom);
                     span.style.opacity = '0';
@@ -1509,17 +1542,23 @@
                 });
             }
 
-            // Generate new ticks immediately
+            // Generate new ticks for VISIBLE 1x range only (not entire 3x buffer)
             const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
-            const totalDuration = timelineEndTime - timelineStartTime;
+            const zoomMs = currentZoom.hours * 60 * 60 * 1000;
+            const totalDuration = timelineEndTime - timelineStartTime; // 3x buffer for positioning
+
+            // Calculate visible 1x range
+            const visibleStart = new Date(centerTime.getTime() - zoomMs / 2);
+            const visibleEnd = new Date(centerTime.getTime() + zoomMs / 2);
 
             // Generate minor ticks
             const minorInterval = currentZoom.minorInterval;
-            const numMinorTicks = Math.floor(totalDuration / minorInterval);
+            const firstMinorTime = new Date(Math.ceil(visibleStart.getTime() / minorInterval) * minorInterval);
+            const numMinorTicks = Math.floor((visibleEnd - firstMinorTime) / minorInterval);
 
             for (let i = 0; i <= numMinorTicks; i++) {
-                const time = new Date(timelineStartTime.getTime() + (i * minorInterval));
-                if (time <= timelineEndTime) {
+                const time = new Date(firstMinorTime.getTime() + (i * minorInterval));
+                if (time >= visibleStart && time <= visibleEnd) {
                     const position = ((time - timelineStartTime) / totalDuration) * 100;
                     const tick = document.createElement('div');
                     tick.className = 'tick minor';
@@ -1532,11 +1571,12 @@
 
             // Generate major ticks
             const majorInterval = currentZoom.interval;
-            const numMajorTicks = Math.floor(totalDuration / majorInterval);
+            const firstMajorTime = new Date(Math.ceil(visibleStart.getTime() / majorInterval) * majorInterval);
+            const numMajorTicks = Math.floor((visibleEnd - firstMajorTime) / majorInterval);
 
             for (let i = 0; i <= numMajorTicks; i++) {
-                const time = new Date(timelineStartTime.getTime() + (i * majorInterval));
-                if (time <= timelineEndTime) {
+                const time = new Date(firstMajorTime.getTime() + (i * majorInterval));
+                if (time >= visibleStart && time <= visibleEnd) {
                     const position = ((time - timelineStartTime) / totalDuration) * 100;
                     const tick = document.createElement('div');
                     tick.className = 'tick major';
@@ -1856,8 +1896,8 @@
             const frameDate = new Date(frameStartTime + metadata.rtpTimestamp);
             lastFrameTime = frameDate;
 
-            // Update timeline center (reloads if approaching edge)
-            updateTimelineCenter(frameDate);
+            // Update timeline with smooth CSS scrolling
+            updateTimelineScroll(frameDate);
 
             // Timeline marker removed - only fixed center line is used
 
@@ -1906,11 +1946,8 @@
                 currentSequenceIndex = newIndex;
                 document.getElementById('seqNum').textContent = `${currentSequenceIndex + 1} / ${sequences.length}`;
 
-                // Reload timeline to center on new sequence start
-                const seq = sequences[newIndex];
-                if (seq) {
-                    setupTimeline(seq.timeBegin, true); // Center on new sequence with animation
-                }
+                // Let CSS scrolling handle the transition smoothly
+                // No reload needed - timeline continues scrolling
 
                 drawSequenceBars();
                 updateFutureZone();
@@ -2218,14 +2255,53 @@
             const displayHours = hours % 12 || 12;
 
             const timeStr = `${displayHours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${ampm}`;
-            const dateStr = selectedDate.toISOString().split('T')[0];
+
+            // Use local date, not UTC (fixes -1 day issue)
+            const year = selectedDate.getFullYear();
+            const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(selectedDate.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
 
             document.getElementById('selectedDateTime').textContent = `${timeStr}, ${dateStr}`;
         }
 
         function showTimePicker() {
-            // TODO: Add time picker UI (hour/minute/second selection)
-            alert('Time picker not yet implemented. Use current time or select date for now.');
+            const currentHours = selectedDate.getHours();
+            const currentMinutes = selectedDate.getMinutes();
+            const currentSeconds = selectedDate.getSeconds();
+
+            const hours = prompt(`Enter hours (0-23):`, currentHours);
+            if (hours === null) return; // Cancelled
+
+            const minutes = prompt(`Enter minutes (0-59):`, currentMinutes);
+            if (minutes === null) return; // Cancelled
+
+            const seconds = prompt(`Enter seconds (0-59):`, currentSeconds);
+            if (seconds === null) return; // Cancelled
+
+            // Validate and apply
+            const h = parseInt(hours);
+            const m = parseInt(minutes);
+            const s = parseInt(seconds);
+
+            if (isNaN(h) || h < 0 || h > 23) {
+                alert('Invalid hours. Must be 0-23.');
+                return;
+            }
+            if (isNaN(m) || m < 0 || m > 59) {
+                alert('Invalid minutes. Must be 0-59.');
+                return;
+            }
+            if (isNaN(s) || s < 0 || s > 59) {
+                alert('Invalid seconds. Must be 0-59.');
+                return;
+            }
+
+            selectedDate.setHours(h);
+            selectedDate.setMinutes(m);
+            selectedDate.setSeconds(s);
+
+            updateSelectedDateTime();
         }
 
         async function applyDateTime() {
