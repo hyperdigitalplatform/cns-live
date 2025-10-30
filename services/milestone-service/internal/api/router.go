@@ -18,8 +18,11 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		v1.GET("/cameras", handler.GetCameras)
 		v1.GET("/cameras/discover", handler.DiscoverCameras)
 
-		// Playback routes
-		v1.GET("/cameras/:cameraId/playback/stream", handler.StreamPlayback)
+		// WebRTC Playback routes
+		v1.POST("/cameras/:cameraId/playback/start", handler.StartWebRTCPlayback)
+		v1.PUT("/playback/webrtc/answer", handler.UpdateWebRTCAnswer)
+		v1.POST("/playback/webrtc/ice", handler.SendICECandidate)
+		v1.GET("/playback/webrtc/ice/:sessionId", handler.GetICECandidates)
 	}
 
 	// Milestone-prefixed routes (for Kong routing)

@@ -162,7 +162,6 @@ export function CameraSidebarRecordingSection({
                 startTime={queryStartTime}
                 endTime={queryEndTime}
                 initialPlaybackTime={playbackTime}
-                streamUrl={`/api/v1/cameras/${selectedCamera.id}/playback/stream?time=${playbackTime.toISOString()}`}
                 onPlaybackTimeChange={setPlaybackTime}
                 className="aspect-video"
               />

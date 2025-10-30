@@ -1,5 +1,7 @@
-import React, { useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, forwardRef, useImperativeHandle, useRef, useCallback } from 'react';
 import { LiveStreamPlayer } from './LiveStreamPlayer';
+import { RecordingPlayer } from './RecordingPlayer';
+import { PlaybackModeToggle, PlaybackControlBar } from './playback';
 import { SaveLayoutDialog } from './SaveLayoutDialog';
 import { LoadLayoutDropdown } from './LoadLayoutDropdown';
 import { LayoutManagerDialog } from './LayoutManagerDialog';
@@ -15,6 +17,7 @@ import {
   Button,
 } from './ui/Dialog';
 import type { Camera, DragItem, LayoutType, LayoutPreferenceSummary } from '@/types';
+import type { PlaybackState, TimelineData } from '@/types/playback';
 import { Grid, Maximize2, X, Plus, Trash2, Save, Settings, AlertTriangle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
@@ -79,6 +82,16 @@ interface GridCell {
   loading: boolean;
   isHotspot?: boolean;
   gridArea?: string;
+  playbackState?: {
+    mode: 'live' | 'playback';
+    isPlaying: boolean;
+    currentTime: Date;
+    startTime: Date;
+    endTime: Date;
+    speed: number;
+    zoomLevel: number;
+    timelineData: TimelineData | null;
+  };
 }
 
 // Helper function to build grid cell structure for hotspot layouts
@@ -125,6 +138,20 @@ function buildHotspotCells(layoutConfig: GridLayout): GridCell[] {
   return cells.slice(0, totalCameras);
 }
 
+// Initialize playback state for a cell
+function initializePlaybackState() {
+  return {
+    mode: 'live' as const,
+    isPlaying: false,
+    currentTime: new Date(),
+    startTime: new Date(Date.now() - 24 * 60 * 60 * 1000), // 24 hours ago
+    endTime: new Date(),
+    speed: 1.0,
+    zoomLevel: 12, // 12 hours
+    timelineData: null,
+  };
+}
+
 export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEnhancedProps>(
   function StreamGridEnhanced({ defaultLayout = '3x3', onLayoutChange }, ref) {
     const [layout, setLayout] = useState<GridLayoutType>(defaultLayout);
@@ -143,6 +170,9 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
     const [gridCells, setGridCells] = useState<GridCell[]>(
       buildHotspotCells(layoutConfig)
     );
+
+    // Debounce timer for seek operations
+    const seekDebounceTimers = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   // Update grid cells when layout changes
   React.useEffect(() => {
@@ -269,6 +299,188 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
     };
     event.dataTransfer.setData('application/json', JSON.stringify(dragData));
     event.dataTransfer.effectAllowed = 'move';
+  };
+
+  // Playback mode handlers
+  const handleModeChange = async (index: number, newMode: 'live' | 'playback') => {
+    const cell = gridCells[index];
+    if (!cell.camera) return;
+
+    if (newMode === 'playback') {
+      // Initialize playback state if not exists
+      if (!cell.playbackState) {
+        const initialState = initializePlaybackState();
+
+        setGridCells((prev) => {
+          const newCells = [...prev];
+          newCells[index] = {
+            ...newCells[index],
+            playbackState: { ...initialState, mode: 'playback' },
+          };
+          return newCells;
+        });
+
+        // Query recordings
+        try {
+          const data = await api.getMilestoneSequences({
+            cameraId: cell.camera.id,
+            startTime: initialState.startTime.toISOString(),
+            endTime: initialState.endTime.toISOString(),
+          });
+
+          // Transform Milestone sequences to timeline format
+          const transformedData = {
+            cameraId: cell.camera.id,
+            queryRange: {
+              start: initialState.startTime.toISOString(),
+              end: initialState.endTime.toISOString(),
+            },
+            sequences: data.sequences.map((seq) => ({
+              sequenceId: `${seq.timeBegin}-${seq.timeEnd}`,
+              startTime: seq.timeBegin,
+              endTime: seq.timeEnd,
+              durationSeconds: (new Date(seq.timeEnd).getTime() - new Date(seq.timeBegin).getTime()) / 1000,
+              available: true,
+              sizeBytes: 0,
+            })),
+            gaps: [],
+            totalRecordingSeconds: 0,
+            totalGapSeconds: 0,
+            coverage: 0,
+          };
+
+          setGridCells((prev) => {
+            const newCells = [...prev];
+            if (newCells[index].playbackState) {
+              newCells[index].playbackState!.timelineData = transformedData;
+            }
+            return newCells;
+          });
+        } catch (error) {
+          console.error('Failed to query recordings:', error);
+          showError('Failed to load recordings');
+        }
+      } else {
+        // Just switch mode
+        setGridCells((prev) => {
+          const newCells = [...prev];
+          newCells[index].playbackState!.mode = 'playback';
+          return newCells;
+        });
+      }
+    } else {
+      // Switch back to live
+      setGridCells((prev) => {
+        const newCells = [...prev];
+        if (newCells[index].playbackState) {
+          newCells[index].playbackState!.mode = 'live';
+        }
+        return newCells;
+      });
+    }
+  };
+
+  const handlePlayPause = (index: number) => {
+    setGridCells((prev) => {
+      const newCells = [...prev];
+      if (newCells[index].playbackState) {
+        newCells[index].playbackState!.isPlaying = !newCells[index].playbackState!.isPlaying;
+      }
+      return newCells;
+    });
+  };
+
+  const handleSeek = useCallback((index: number, newTime: Date, immediate = false) => {
+    const cell = gridCells[index];
+    if (!cell.camera || !cell.playbackState) return;
+
+    // Clear existing debounce timer for this cell
+    const existingTimer = seekDebounceTimers.current.get(index);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    // If immediate seek (e.g., from timeline click), update right away
+    if (immediate) {
+      setGridCells((prev) => {
+        const newCells = [...prev];
+        if (newCells[index].playbackState) {
+          newCells[index].playbackState!.currentTime = newTime;
+        }
+        return newCells;
+      });
+      return;
+    }
+
+    // Otherwise, debounce the seek operation (500ms delay)
+    const timer = setTimeout(() => {
+      setGridCells((prev) => {
+        const newCells = [...prev];
+        if (newCells[index].playbackState) {
+          newCells[index].playbackState!.currentTime = newTime;
+        }
+        return newCells;
+      });
+      seekDebounceTimers.current.delete(index);
+    }, 500);
+
+    seekDebounceTimers.current.set(index, timer);
+  }, [gridCells]);
+
+  const handleScrollTimeline = (index: number, direction: 'left' | 'right') => {
+    const cell = gridCells[index];
+    if (!cell.playbackState) return;
+
+    const scrollAmount = cell.playbackState.zoomLevel * 60 * 60 * 1000; // zoom level in ms
+
+    setGridCells((prev) => {
+      const newCells = [...prev];
+      if (newCells[index].playbackState) {
+        const state = newCells[index].playbackState!;
+        state.startTime = new Date(
+          direction === 'left'
+            ? state.startTime.getTime() - scrollAmount
+            : state.startTime.getTime() + scrollAmount
+        );
+        state.endTime = new Date(
+          direction === 'left'
+            ? state.endTime.getTime() - scrollAmount
+            : state.endTime.getTime() + scrollAmount
+        );
+      }
+      return newCells;
+    });
+  };
+
+  const handleZoomChange = (index: number, newZoomLevel: number) => {
+    const cell = gridCells[index];
+    if (!cell.playbackState) return;
+
+    const center = cell.playbackState.currentTime.getTime();
+    const halfDuration = (newZoomLevel * 60 * 60 * 1000) / 2;
+
+    setGridCells((prev) => {
+      const newCells = [...prev];
+      if (newCells[index].playbackState) {
+        newCells[index].playbackState!.zoomLevel = newZoomLevel;
+        newCells[index].playbackState!.startTime = new Date(center - halfDuration);
+        newCells[index].playbackState!.endTime = new Date(center + halfDuration);
+      }
+      return newCells;
+    });
+  };
+
+  const hasRecordingAtCurrentTime = (index: number): boolean => {
+    const cell = gridCells[index];
+    if (!cell.playbackState || !cell.playbackState.timelineData) return false;
+
+    const currentTimestamp = cell.playbackState.currentTime.getTime();
+
+    return cell.playbackState.timelineData.sequences.some((seq) => {
+      const start = new Date(seq.startTime).getTime();
+      const end = new Date(seq.endTime).getTime();
+      return currentTimestamp >= start && currentTimestamp <= end;
+    });
   };
 
   const handleClearAllClick = () => {
@@ -543,7 +755,9 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
               onDrop={(e) => handleDrop(e, index)}
               style={cell.gridArea ? { gridArea: cell.gridArea } : undefined}
               className={cn(
-                'relative rounded-lg overflow-hidden shadow-md group transition-all',
+                'relative rounded-lg shadow-md group transition-all',
+                // Use overflow-visible to allow dropdowns to show, video players handle their own overflow
+                cell.camera ? 'overflow-visible' : 'overflow-hidden',
                 cell.camera
                   ? 'bg-gray-900 cursor-move'
                   : 'bg-gray-200 border-2 border-dashed border-gray-300',
@@ -553,27 +767,59 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
             >
               {cell.camera ? (
                 <>
-                  {/* Camera stream */}
-                  <LiveStreamPlayer
-                    key={cell.camera.id}
-                    camera={cell.camera}
-                    quality="medium"
-                  />
+                  {/* Video Player - Live or Playback */}
+                  {cell.playbackState?.mode === 'playback' ? (
+                    <RecordingPlayer
+                      key={cell.camera.id}
+                      cameraId={cell.camera.id}
+                      startTime={cell.playbackState.startTime}
+                      endTime={cell.playbackState.endTime}
+                      initialPlaybackTime={cell.playbackState.currentTime}
+                      onPlaybackTimeChange={(time) => handleSeek(index, time)}
+                      onPlaybackStateChange={(state) => {
+                        if (state === 'playing' && !cell.playbackState!.isPlaying) {
+                          handlePlayPause(index);
+                        } else if (state === 'paused' && cell.playbackState!.isPlaying) {
+                          handlePlayPause(index);
+                        }
+                      }}
+                      showControls={false}
+                      className="absolute inset-0"
+                    />
+                  ) : (
+                    <LiveStreamPlayer
+                      key={cell.camera.id}
+                      camera={cell.camera}
+                      quality="medium"
+                    />
+                  )}
 
-                  {/* Camera info overlay */}
-                  <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <p className="text-white text-sm font-medium truncate">
-                      {cell.camera.name}
-                    </p>
-                    {cell.camera.name_ar && (
-                      <p className="text-white/80 text-xs truncate">
-                        {cell.camera.name_ar}
-                      </p>
-                    )}
+                  {/* Camera info overlay with mode toggle */}
+                  <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-medium truncate">
+                          {cell.camera.name}
+                        </p>
+                        {cell.camera.name_ar && (
+                          <p className="text-white/80 text-xs truncate">
+                            {cell.camera.name_ar}
+                          </p>
+                        )}
+                      </div>
+                      {/* Mode Toggle - only show if camera has milestone_device_id */}
+                      {cell.camera.milestone_device_id && (
+                        <PlaybackModeToggle
+                          mode={cell.playbackState?.mode || 'live'}
+                          onChange={(mode) => handleModeChange(index, mode)}
+                          className="flex-shrink-0"
+                        />
+                      )}
+                    </div>
                   </div>
 
                   {/* Action buttons */}
-                  <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                     <button
                       onClick={() => setFullscreenIndex(index)}
                       className="p-2 bg-black/70 hover:bg-black/90 text-white rounded-lg transition-colors"
@@ -590,10 +836,32 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                     </button>
                   </div>
 
-                  {/* Cell number badge */}
-                  <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                    {cell.isHotspot ? 'Hotspot' : `Cell ${index + 1}`}
-                  </div>
+                  {/* Playback Controls */}
+                  {cell.playbackState?.mode === 'playback' &&
+                   cell.playbackState.timelineData && (
+                    <div className="absolute bottom-0 left-0 right-0 z-30">
+                      <PlaybackControlBar
+                        startTime={cell.playbackState.startTime}
+                        endTime={cell.playbackState.endTime}
+                        currentTime={cell.playbackState.currentTime}
+                        sequences={cell.playbackState.timelineData.sequences}
+                        isPlaying={cell.playbackState.isPlaying}
+                        zoomLevel={cell.playbackState.zoomLevel}
+                        onPlayPause={() => handlePlayPause(index)}
+                        onSeek={(time) => handleSeek(index, time, true)}
+                        onScrollTimeline={(direction) => handleScrollTimeline(index, direction)}
+                        onZoomChange={(zoom) => handleZoomChange(index, zoom)}
+                        hasRecording={hasRecordingAtCurrentTime(index)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Cell number badge - only show in live mode */}
+                  {cell.playbackState?.mode !== 'playback' && (
+                    <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                      {cell.isHotspot ? 'Hotspot' : `Cell ${index + 1}`}
+                    </div>
+                  )}
 
                   {/* Hotspot indicator */}
                   {cell.isHotspot && (

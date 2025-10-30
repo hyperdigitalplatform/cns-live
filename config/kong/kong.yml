@@ -434,17 +434,45 @@ services:
           - sequences
           - dashboard
 
-      # Playback stream route
-      - name: milestone-playback-stream
+      # WebRTC Playback routes (milestone handles playback via WebRTC)
+      - name: milestone-playback-start
         paths:
-          - ~/api/v1/cameras/[^/]+/playback/stream$
+          - ~/api/v1/cameras/[^/]+/playback/start$
         methods:
-          - GET
+          - POST
           - OPTIONS
         strip_path: false
         preserve_host: false
         tags:
           - playback
+          - webrtc
+          - dashboard
+
+      - name: milestone-playback-webrtc-answer
+        paths:
+          - /api/v1/playback/webrtc/answer
+        methods:
+          - PUT
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - playback
+          - webrtc
+          - dashboard
+
+      - name: milestone-playback-webrtc-ice
+        paths:
+          - ~/api/v1/playback/webrtc/ice
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+        preserve_host: false
+        tags:
+          - playback
+          - webrtc
           - dashboard
 
       # Timeline route

@@ -124,3 +124,38 @@ type CameraDiscoveryResponse struct {
 	Cameras []types.DiscoveredCamera `json:"cameras"`
 	Total   int                      `json:"total"`
 }
+
+// ============================================================================
+// WebRTC Playback Models
+// ============================================================================
+
+// WebRTCPlaybackRequest represents the request to start WebRTC playback
+type WebRTCPlaybackRequest struct {
+	PlaybackTime string  `json:"playbackTime" binding:"required"` // ISO 8601 format
+	SkipGaps     bool    `json:"skipGaps"`                        // Skip gaps between recordings
+	Speed        float64 `json:"speed"`                           // Playback speed (default 1.0)
+	StreamID     string  `json:"streamId,omitempty"`              // Optional stream ID
+}
+
+// WebRTCAnswerRequest represents the answer SDP from client
+type WebRTCAnswerRequest struct {
+	SessionID string `json:"sessionId" binding:"required"`
+	AnswerSDP string `json:"answerSDP" binding:"required"`
+}
+
+// ICECandidateRequest represents an ICE candidate from client
+type ICECandidateRequest struct {
+	SessionID string      `json:"sessionId" binding:"required"`
+	Candidate interface{} `json:"candidate" binding:"required"`
+}
+
+// WebRTCSessionResponse represents the WebRTC session response
+type WebRTCSessionResponse struct {
+	SessionID string `json:"sessionId"`
+	OfferSDP  string `json:"offerSDP"`
+}
+
+// ICECandidatesResponse represents ICE candidates from server
+type ICECandidatesResponse struct {
+	Candidates []interface{} `json:"candidates"`
+}

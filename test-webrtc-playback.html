@@ -1,0 +1,2268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Playback Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #videoContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Playback Control Bar */
+        #playbackBar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.8) 100%);
+            transition: transform 0.3s ease;
+            z-index: 100;
+        }
+
+        #playbackBar.collapsed .controls-row {
+            display: none;
+        }
+
+        #playbackBar.collapsed .timeline-container {
+            display: none;
+        }
+
+        #playbackBar.collapsed .zoom-controls {
+            display: none;
+        }
+
+        #playbackBar.collapsed .bottom-controls {
+            padding: 8px 20px;
+        }
+
+        .collapsed-time {
+            display: none;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            color: #fff;
+            position: absolute;
+            left: 20px;
+        }
+
+        #playbackBar.collapsed .collapsed-time {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .collapsed-time .icon {
+            width: 16px;
+            height: 16px;
+            background: #0078d4;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #fff;
+        }
+
+        /* Speed Dropdown */
+        .speed-selector {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: rgba(30, 30, 30, 0.95);
+            border: 1px solid #444;
+            border-radius: 4px;
+            overflow: hidden;
+            display: none;
+            z-index: 1000;
+        }
+
+        .speed-selector.show {
+            display: block;
+        }
+
+        .speed-option {
+            padding: 8px 16px;
+            cursor: pointer;
+            color: #fff;
+            transition: background 0.2s;
+        }
+
+        .speed-option:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .speed-option.active {
+            background: #0078d4;
+        }
+
+        /* Playback Controls */
+        .controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px 20px;
+            gap: 15px;
+        }
+
+        .control-btn {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.9);
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            color: #fff;
+            transform: scale(1.15);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .control-btn.play-pause {
+            font-size: 24px;
+        }
+
+        /* Timeline */
+        .timeline-container {
+            padding: 0 20px 15px 20px;
+            position: relative;
+            overflow: visible; /* Changed from hidden to allow speed dropdown visibility */
+        }
+
+        /* Scrollable content wrapper - this will be transformed */
+        .timeline-content-wrapper {
+            position: relative;
+            width: 100%;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
+            overflow: hidden; /* Clip content that scrolls outside visible area */
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 11px;
+            color: #888;
+            position: relative;
+        }
+
+        .timeline-scale {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            position: relative;
+            font-size: 12px;
+            font-weight: 500;
+            color: #aaa;
+        }
+
+        .timeline-scale span {
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            white-space: nowrap;
+            transform-origin: center center;
+        }
+
+        /* Timeline Tick Marks (Ruler Divides) */
+        .timeline-ticks {
+            position: relative;
+            width: 100%;
+            height: 15px;
+            margin-bottom: 5px;
+        }
+
+        .tick {
+            position: absolute;
+            bottom: 0;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.3);
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center bottom;
+        }
+
+        .tick.major {
+            height: 15px;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .tick.minor {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .current-time {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            background: #fff;
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            z-index: 15;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        .current-time .icon {
+            width: 16px;
+            height: 16px;
+            background: #0078d4;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #fff;
+        }
+
+        /* Fixed time+date indicator at center - does NOT scroll with content */
+        .current-time-fixed {
+            position: absolute;
+            left: 50%;
+            top: 15px; /* Position at top of timeline header */
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            background: #fff;
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            z-index: 150; /* Above white line and scrollable content */
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        .current-time-fixed .icon {
+            width: 16px;
+            height: 16px;
+            background: #0078d4;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #fff;
+        }
+
+        .timeline-track {
+            position: relative;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+
+        .timeline-sequences {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .sequence-bar {
+            position: absolute;
+            top: 5px;
+            bottom: 5px;
+            background: #cc6600;
+            border-radius: 2px;
+            transition: background 0.2s, left 0.3s ease, width 0.3s ease;
+        }
+
+        .sequence-bar.motion {
+            background: #c44;
+        }
+
+        .sequence-bar.current {
+            background: #ff8800; /* Brighter orange for current sequence */
+        }
+
+        .timeline-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #fff;
+            pointer-events: none;
+            z-index: 10;
+            transition: left 0.3s ease;
+            display: none; /* Hidden - only fixed white line at center is used */
+        }
+
+        /* Center indicator line - FIXED at center, always visible */
+        .timeline-center-indicator {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #fff;
+            pointer-events: none;
+            z-index: 100; /* Above all content */
+            transform: translateX(-50%);
+        }
+
+        /* Future zone - represents time that hasn't happened yet */
+        .timeline-future-zone {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            background: rgba(76, 175, 80, 0.15);
+            pointer-events: none;
+            z-index: 5;
+            display: none;
+            transition: left 0.3s ease, width 0.3s ease;
+        }
+
+        .timeline-future-zone.visible {
+            display: block;
+        }
+
+        .timeline-times {
+            display: none; /* Hidden - using inline scale now */
+        }
+
+        .camera-label {
+            font-size: 11px;
+            color: #0af;
+            margin-top: 5px;
+        }
+
+        /* Bottom Controls */
+        .bottom-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            min-height: 50px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .mode-btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .mode-btn.active {
+            background: #00b8d4;
+            color: #fff;
+        }
+
+        .mode-btn:not(.active):hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+            position: absolute;
+            right: 20px;
+        }
+
+        .zoom-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: none;
+            color: #fff;
+            width: 26px;
+            height: 26px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 300;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .speed-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: none;
+            color: rgba(255, 255, 255, 0.9);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            position: absolute;
+            right: 0;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .speed-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .collapse-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .collapse-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Zoom Slider Styling */
+        #zoomSlider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 120px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+            outline: none;
+            margin: 0 8px;
+        }
+
+        #zoomSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #zoomSlider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        #zoomSlider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #zoomSlider::-moz-range-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Diagnostics Panel */
+        #diagnostics {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+            max-width: 300px;
+            z-index: 50;
+            display: none;
+        }
+
+        #diagnostics.show {
+            display: block;
+        }
+
+        .diag-row {
+            margin-bottom: 5px;
+        }
+
+        .diag-label {
+            color: #888;
+        }
+
+        .diag-value {
+            color: #0f0;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error Message */
+        .error-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(200, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+            z-index: 201;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* Info Message (non-blocking notification) */
+        .info-message {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 120, 212, 0.95);
+            padding: 12px 20px;
+            border-radius: 6px;
+            text-align: center;
+            display: none;
+            z-index: 200;
+            font-size: 14px;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.3s ease;
+        }
+
+        .info-message.show {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        /* Config Panel */
+        #configPanel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 4px;
+            z-index: 50;
+            min-width: 300px;
+        }
+
+        #configPanel input {
+            width: 100%;
+            padding: 6px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 3px;
+        }
+
+        #configPanel button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 10px;
+            background: #0078d4;
+            border: none;
+            color: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        #configPanel button:hover {
+            background: #006abc;
+        }
+
+        .close-config {
+            float: right;
+            cursor: pointer;
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        /* Date/Time Picker Modal */
+        .datetime-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.98);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            z-index: 300;
+            display: none;
+            min-width: 320px;
+            transition: all 0.3s ease;
+        }
+
+        /* When control bar is collapsed, position modal at top-left */
+        .datetime-modal.collapsed-mode {
+            top: 20px;
+            left: 20px;
+            transform: none;
+        }
+
+        .datetime-modal.show {
+            display: block;
+        }
+
+        .datetime-modal h3 {
+            margin: 0 0 15px 0;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .datetime-display {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #0078d4;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #0af;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .calendar-month {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 10px;
+        }
+
+        .calendar-nav button,
+        .today-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .calendar-nav button:hover,
+        .today-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 15px;
+        }
+
+        .calendar-day-header {
+            text-align: center;
+            font-size: 11px;
+            color: #888;
+            padding: 8px 0;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .calendar-day:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .calendar-day.other-month {
+            color: #555;
+        }
+
+        .calendar-day.selected {
+            background: #0078d4;
+            color: #fff;
+        }
+
+        .calendar-day.today {
+            border: 1px solid #0078d4;
+        }
+
+        .datetime-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .datetime-actions button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .datetime-actions .cancel-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .datetime-actions .apply-btn {
+            background: #0078d4;
+            color: #fff;
+        }
+
+        .datetime-actions button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div id="videoContainer">
+        <video id="video" autoplay playsinline></video>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Error Message -->
+        <div class="error-message" id="errorMessage">
+            <h3>&#9888; Playback Error</h3>
+            <p id="errorText"></p>
+            <button onclick="closeError()" style="margin-top: 10px; padding: 8px 16px; background: #fff; color: #c00; border: none; border-radius: 3px; cursor: pointer;">Close</button>
+        </div>
+
+        <!-- Info Message (non-blocking notification) -->
+        <div class="info-message" id="infoMessage"></div>
+
+        <!-- Diagnostics Panel -->
+        <div id="diagnostics">
+            <div class="diag-row">
+                <span class="diag-label">FPS:</span>
+                <span class="diag-value" id="fps">0</span>
+            </div>
+            <div class="diag-row">
+                <span class="diag-label">State:</span>
+                <span class="diag-value" id="state">Idle</span>
+            </div>
+            <div class="diag-row">
+                <span class="diag-label">Sequence:</span>
+                <span class="diag-value" id="seqNum">-</span>
+            </div>
+        </div>
+
+        <!-- Configuration Panel -->
+        <div id="configPanel">
+            <span class="close-config" onclick="closeConfig()">&times;</span>
+            <h3 style="margin-bottom: 15px;">Playback Configuration</h3>
+            <label style="font-size: 12px; color: #aaa;">Camera ID:</label>
+            <input type="text" id="cameraId" value="d47fa4e9-8171-4cc2-a421-95a3194f6a1d">
+            <button onclick="initializeTimeline()">Load Timeline (Most Recent)</button>
+            <button onclick="toggleDiagnostics()" style="background: #555; margin-top: 5px;">Toggle Diagnostics</button>
+        </div>
+
+        <!-- Date/Time Picker Modal -->
+        <div class="datetime-modal" id="datetimeModal">
+            <h3>Select date and time</h3>
+
+            <div class="datetime-display" onclick="showTimePicker()">
+                <span>&#9719;</span>
+                <span id="selectedDateTime">6:10:46 AM, 2025-10-28</span>
+            </div>
+
+            <div class="calendar-header">
+                <div class="calendar-month">
+                    <span id="calendarMonth">Oct</span>
+                    <span id="calendarYear">2025</span>
+                </div>
+                <div class="calendar-nav">
+                    <button onclick="changeMonth(-1)">&lt;</button>
+                    <button class="today-btn" onclick="goToToday()">Today</button>
+                    <button onclick="changeMonth(1)">&gt;</button>
+                </div>
+            </div>
+
+            <div class="calendar-grid" id="calendarGrid">
+                <!-- Day headers -->
+                <div class="calendar-day-header">Sun</div>
+                <div class="calendar-day-header">Mon</div>
+                <div class="calendar-day-header">Tue</div>
+                <div class="calendar-day-header">Wed</div>
+                <div class="calendar-day-header">Thu</div>
+                <div class="calendar-day-header">Fri</div>
+                <div class="calendar-day-header">Sat</div>
+                <!-- Days will be rendered by JavaScript -->
+            </div>
+
+            <div class="datetime-actions">
+                <button class="cancel-btn" onclick="closeDateTimePicker()">Cancel</button>
+                <button class="apply-btn" onclick="applyDateTime()">Go to time</button>
+            </div>
+        </div>
+
+        <!-- Playback Control Bar -->
+        <div id="playbackBar">
+            <!-- Playback Controls -->
+            <div class="controls-row">
+                <button class="control-btn" onclick="skipBackward()" title="Backward">|&lt;</button>
+                <button class="control-btn play-pause" id="playBtn" onclick="togglePlay()" title="Play/Pause">&#9654;</button>
+                <button class="control-btn" onclick="skipForward()" title="Forward">&gt;|</button>
+            </div>
+
+            <!-- Timeline -->
+            <div class="timeline-container">
+                <!-- Fixed white line indicator at center -->
+                <div class="timeline-center-indicator"></div>
+
+                <!-- Fixed time+date indicator at center (outside scrollable content) -->
+                <div class="current-time-fixed" onclick="openDateTimePicker()" title="Click to select date/time">
+                    <span class="icon">&#9719;</span>
+                    <span id="currentTimeDisplay">--:--:--.--- AM, --------</span>
+                </div>
+
+                <!-- Scrollable timeline content wrapper -->
+                <div class="timeline-content-wrapper" id="timelineContentWrapper">
+                    <div class="timeline-header">
+                        <div class="timeline-scale" id="timelineScale">
+                            <!-- Time labels generated here (NO current-time inside) -->
+                        </div>
+                    </div>
+
+                    <!-- Ruler Tick Marks -->
+                    <div class="timeline-ticks" id="timelineTicks"></div>
+
+                    <div class="timeline-track" id="timelineTrack" onclick="seekTimeline(event)">
+                        <div class="timeline-sequences" id="timelineSequences"></div>
+                        <div class="timeline-future-zone" id="timelineFutureZone"></div>
+                        <div class="timeline-marker" id="timelineMarker"></div>
+                    </div>
+                </div>
+
+                <div class="timeline-times" id="timelineTimes">
+                    <span>12:00 AM</span>
+                    <span>1:00 AM</span>
+                    <span>2:00 AM</span>
+                </div>
+
+                <div class="camera-label" id="cameraLabel">
+                    tp-link Tapo C225 (192.168.1.8) - Camera 1
+                </div>
+
+                <!-- Speed Selector positioned OUTSIDE at top right -->
+                <button class="speed-btn" onclick="toggleSpeedSelector()" style="position: absolute; right: 10px; top: -40px;">
+                    <span id="speedDisplay">1x</span> &#9660;
+                </button>
+
+                <!-- Speed Selector Dropdown -->
+                <div class="speed-selector" id="speedSelector">
+                    <div class="speed-option" data-speed="0.25">0.25x</div>
+                    <div class="speed-option" data-speed="0.5">0.5x</div>
+                    <div class="speed-option" data-speed="1" class="active">1x</div>
+                    <div class="speed-option" data-speed="2">2x</div>
+                    <div class="speed-option" data-speed="4">4x</div>
+                    <div class="speed-option" data-speed="8">8x</div>
+                    <div class="speed-option" data-speed="16">16x</div>
+                </div>
+            </div>
+
+            <!-- Bottom Controls -->
+            <div class="bottom-controls">
+                <div class="collapsed-time" onclick="openDateTimePicker()" style="cursor: pointer;" title="Click to select date/time">
+                    <span class="icon">&#9719;</span>
+                    <span id="collapsedTimeDisplay">--:--:--.--- AM, --------</span>
+                </div>
+
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="playbackModeBtn" onclick="setMode('playback')">PLAYBACK</button>
+                    <button class="mode-btn" id="liveModeBtn" onclick="setMode('live')">LIVE</button>
+                    <button class="collapse-btn" id="collapseBtn" onclick="toggleCollapse()">&#9660;</button>
+                </div>
+
+                <div class="zoom-controls">
+                    <span id="zoomDisplay">30 min</span>
+                    <button class="zoom-btn" onclick="zoomOut()">−</button>
+                    <input type="range" id="zoomSlider" min="0" max="9" value="3" step="1"
+                           onchange="setZoomFromSlider(this.value)">
+                    <button class="zoom-btn" onclick="zoomIn()">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebRTC State
+        let pc = null;
+        let sessionId = null;
+        let isPlaying = false;
+        let currentSpeed = 1.0;
+        let sequences = [];
+        let currentSequenceIndex = -1;
+        let frameStartTime = null;
+        let lastFrameTime = null;
+
+        // Current session state
+        let currentCameraId = null;
+        let currentPlaybackTime = null;
+        let timelineReady = false;
+
+        // Timeline State
+        let timelineStartTime = null;
+        let timelineEndTime = null;
+        let centerTime = null; // Time that the white center line is pointing at
+        let timelineScrollOffset = 0; // Current scroll offset in pixels
+        let zoomLevelIndex = 3; // Start at 30 min
+        const ZOOM_LEVELS = [
+            { hours: 1/60,  label: '1 min',  interval: 10 * 1000,        minorInterval: 2 * 1000 },       // Major: 10s, Minor: 2s
+            { hours: 5/60,  label: '5 min',  interval: 60 * 1000,        minorInterval: 10 * 1000 },      // Major: 1m, Minor: 10s
+            { hours: 10/60, label: '10 min', interval: 1 * 60 * 1000,    minorInterval: 15 * 1000 },      // Major: 1m, Minor: 15s
+            { hours: 0.5,   label: '30 min', interval: 5 * 60 * 1000,    minorInterval: 1 * 60 * 1000 },  // Major: 5m, Minor: 1m
+            { hours: 1,     label: '1 hr',   interval: 5 * 60 * 1000,    minorInterval: 1 * 60 * 1000 },  // Major: 5m, Minor: 1m
+            { hours: 2,     label: '2 hr',   interval: 10 * 60 * 1000,   minorInterval: 2 * 60 * 1000 },  // Major: 10m, Minor: 2m
+            { hours: 8,     label: '8 hr',   interval: 60 * 60 * 1000,   minorInterval: 15 * 60 * 1000 }, // Major: 1h, Minor: 15m
+            { hours: 16,    label: '16 hr',  interval: 2 * 60 * 60 * 1000, minorInterval: 30 * 60 * 1000 }, // Major: 2h, Minor: 30m
+            { hours: 24,    label: '1 d',    interval: 4 * 60 * 60 * 1000, minorInterval: 1 * 60 * 60 * 1000 }, // Major: 4h, Minor: 1h
+            { hours: 168,   label: '1 wk',   interval: 24 * 60 * 60 * 1000, minorInterval: 6 * 60 * 60 * 1000 } // Major: 1d, Minor: 6h
+        ];
+
+        // Timeline Drag State
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartTime = null;
+
+        // FPS Counter
+        let frameCount = 0;
+        let lastFpsUpdate = Date.now();
+
+        // Initialize
+        window.onload = function() {
+            setupSpeedSelector();
+            setupTimelineDrag();
+            console.log('WebRTC Playback Test Ready');
+        };
+
+        function setupSpeedSelector() {
+            document.querySelectorAll('.speed-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const speed = parseFloat(this.dataset.speed);
+                    setSpeed(speed);
+                });
+            });
+        }
+
+        function setupTimelineDrag() {
+            const timelineTrack = document.getElementById('timelineTrack');
+
+            timelineTrack.addEventListener('mousedown', function(e) {
+                // Don't start drag if clicking on seek
+                if (e.target !== timelineTrack && e.target.closest('.timeline-sequences, .timeline-marker, .timeline-future-zone, .timeline-center-indicator')) {
+                    return;
+                }
+
+                isDragging = true;
+                dragStartX = e.clientX;
+                dragStartTime = new Date((timelineStartTime.getTime() + timelineEndTime.getTime()) / 2);
+                timelineTrack.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging || !timelineStartTime) return;
+
+                const deltaX = e.clientX - dragStartX;
+                const timelineWidth = timelineTrack.offsetWidth;
+                const totalDuration = timelineEndTime - timelineStartTime;
+
+                // Calculate time offset based on pixel movement
+                const timeOffset = -(deltaX / timelineWidth) * totalDuration;
+                const newCenterTime = new Date(dragStartTime.getTime() + timeOffset);
+
+                // Check if we're trying to drag into the future
+                const now = new Date();
+                const halfDuration = totalDuration / 2;
+                const newEndTime = new Date(newCenterTime.getTime() + halfDuration);
+
+                // Hard stop: don't allow timeline end to go beyond current time
+                if (newEndTime > now) {
+                    // Clamp to current time
+                    const clampedCenter = new Date(now.getTime() - halfDuration);
+                    setupTimeline(clampedCenter.toISOString());
+                } else {
+                    // Normal drag
+                    setupTimeline(newCenterTime.toISOString());
+                }
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    timelineTrack.style.cursor = 'pointer';
+                }
+            });
+        }
+
+        function toggleSpeedSelector() {
+            const selector = document.getElementById('speedSelector');
+            selector.classList.toggle('show');
+        }
+
+        function setSpeed(speed) {
+            currentSpeed = speed;
+            document.getElementById('speedDisplay').textContent = speed + 'x';
+
+            // Update active state
+            document.querySelectorAll('.speed-option').forEach(opt => {
+                opt.classList.toggle('active', parseFloat(opt.dataset.speed) === speed);
+            });
+
+            // Close dropdown
+            document.getElementById('speedSelector').classList.remove('show');
+
+            // If playing, restart with new speed
+            if (isPlaying) {
+                console.log('Speed changed to', speed);
+                // TODO: Implement speed change in WebRTC session
+            }
+        }
+
+        async function initializeTimeline(specifiedTime = null, animate = true) {
+            try {
+                closeConfig();
+                showLoading(true);
+                document.getElementById('state').textContent = 'Loading timeline...';
+
+                currentCameraId = document.getElementById('cameraId').value;
+
+                // Initial playback time (for loading sequences)
+                let initialTime;
+                if (specifiedTime) {
+                    initialTime = specifiedTime;
+                } else {
+                    const now = new Date();
+                    const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
+                    initialTime = twoMinutesAgo.toISOString();
+                }
+
+                console.log('Initializing timeline:', currentCameraId, initialTime);
+
+                // Load sequences for the day
+                await loadSequences(currentCameraId, initialTime, animate);
+
+                // Determine actual playback time based on sequences
+                if (sequences.length > 0) {
+                    if (specifiedTime) {
+                        // User selected specific time - use it
+                        currentPlaybackTime = specifiedTime;
+                    } else {
+                        // Default: use most recent sequence's end time (minus 5 seconds for buffer)
+                        const mostRecentSeq = sequences[sequences.length - 1];
+                        const seqEndTime = new Date(mostRecentSeq.timeEnd);
+                        const fiveSecondsBeforeEnd = new Date(seqEndTime.getTime() - 5000);
+                        currentPlaybackTime = fiveSecondsBeforeEnd.toISOString();
+                        console.log('Timeline ready. Most recent sequence time:', currentPlaybackTime);
+                    }
+
+                    // Find current sequence based on actual playback time
+                    currentSequenceIndex = findSequenceForTime(currentPlaybackTime);
+                    document.getElementById('seqNum').textContent = `${currentSequenceIndex + 1} / ${sequences.length}`;
+
+                    // Update timeline to center on playback time (sequence start)
+                    setupTimeline(currentPlaybackTime, animate);
+
+                    // Mark timeline as ready
+                    timelineReady = true;
+                    document.getElementById('state').textContent = 'Ready - Press Play to start';
+                } else {
+                    // No sequences - just show timeline with future zone
+                    console.info('No sequences available. Showing timeline only.');
+                    document.getElementById('state').textContent = 'No recordings at this time';
+                    timelineReady = false;
+                }
+
+                showLoading(false);
+
+            } catch (error) {
+                console.error('Timeline initialization error:', error);
+                showError(error.message);
+                showLoading(false);
+                timelineReady = false;
+            }
+        }
+
+        async function actuallyStartPlayback(retryCount = 0) {
+            if (!timelineReady || !currentCameraId || !currentPlaybackTime) {
+                console.error('Timeline not ready. Initialize first.');
+                return;
+            }
+
+            const maxRetries = 2;
+            const retryDelay = 2000; // 2 seconds
+
+            try {
+                showLoading(true);
+                const statusText = retryCount > 0 ? `Connecting (retry ${retryCount}/${maxRetries})...` : 'Connecting...';
+                document.getElementById('state').textContent = statusText;
+
+                // Set frame start time
+                frameStartTime = new Date(currentPlaybackTime).getTime();
+
+                // Create WebRTC connection
+                await initiateWebRTC(currentCameraId, currentPlaybackTime);
+
+                isPlaying = true;
+                updatePlayButton();
+                showLoading(false);
+
+            } catch (error) {
+                console.error('Playback error:', error);
+
+                // Retry on timeout or session failed errors
+                if (retryCount < maxRetries && (error.message.includes('timeout') || error.message.includes('webrtc_session_failed'))) {
+                    console.log(`Retrying playback in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+                    showLoading(false);
+                    document.getElementById('state').textContent = `Retrying in ${retryDelay/1000}s...`;
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    return actuallyStartPlayback(retryCount + 1);
+                }
+
+                showError(error.message);
+                showLoading(false);
+                document.getElementById('state').textContent = 'Error';
+            }
+        }
+
+        async function loadSequences(cameraId, playbackTime, animate = true) {
+            const date = new Date(playbackTime);
+            const startTime = new Date(date);
+            startTime.setHours(0, 0, 0, 0);
+            const endTime = new Date(date);
+            endTime.setHours(23, 59, 59, 999);
+
+            const response = await fetch('/api/v1/milestone/sequences', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cameraId: cameraId,
+                    startTime: startTime.toISOString(),
+                    endTime: endTime.toISOString()
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load sequences');
+            }
+
+            const data = await response.json();
+            sequences = data.sequences || [];
+
+            console.log(`Loaded ${sequences.length} sequences`);
+
+            // If no sequences, show info message but continue (timeline will be empty with future zone)
+            if (sequences.length === 0) {
+                console.info('No recordings found at this time. Timeline will show future zone only.');
+                // Show a non-blocking message to user
+                const infoMsg = document.getElementById('infoMessage');
+                if (infoMsg) {
+                    infoMsg.textContent = 'No recordings at this time. Use the calendar to select a different date/time.';
+                    infoMsg.classList.add('show');
+                    setTimeout(() => { infoMsg.classList.remove('show'); }, 5000);
+                }
+
+                // Setup timeline with current time
+                setupTimeline(playbackTime, animate);
+            }
+
+            // Note: currentSequenceIndex and timeline setup are done in initializeTimeline
+            // after determining the actual playback time
+        }
+
+        function findSequenceForTime(time) {
+            const timestamp = new Date(time);
+            for (let i = 0; i < sequences.length; i++) {
+                const seqStart = new Date(sequences[i].timeBegin);
+                const seqEnd = new Date(sequences[i].timeEnd);
+                if (timestamp >= seqStart && timestamp <= seqEnd) {
+                    return i;
+                }
+                if (timestamp < seqStart) {
+                    return i;
+                }
+            }
+            return sequences.length - 1;
+        }
+
+        function setupTimeline(centerTimeParam, animate = true) {
+            // Use the provided center time (set once at initialization)
+            const center = new Date(centerTimeParam);
+            const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
+            const zoomMs = currentZoom.hours * 60 * 60 * 1000; // hours to ms
+
+            // Use exactly the zoom range (no buffer)
+            timelineStartTime = new Date(center.getTime() - zoomMs / 2);
+            timelineEndTime = new Date(center.getTime() + zoomMs / 2);
+
+            // Update center time and display
+            centerTime = center;
+            updateCurrentTimeDisplay(center);
+
+            // Update time labels (with animation control)
+            updateTimelineLabels(animate);
+
+            // Update tick marks (with animation control)
+            updateTimelineTicks(animate);
+
+            // Draw sequence bars
+            drawSequenceBars();
+
+            // Update future zone overlay
+            updateFutureZone();
+
+            // Reset scroll offset (no scrolling needed, timeline centered on target)
+            const wrapper = document.getElementById('timelineContentWrapper');
+            if (wrapper) {
+                wrapper.style.transition = 'none';
+                wrapper.style.transform = 'translateX(0px)';
+                timelineScrollOffset = 0;
+            }
+        }
+
+        // Update timeline to center on a specific time (reloads if needed)
+        function updateTimelineCenter(targetTime) {
+            if (!timelineStartTime || !timelineEndTime) return;
+
+            let target = new Date(targetTime);
+
+            // BOUNDARY CONSTRAINT: Cannot go into future
+            const now = new Date();
+            if (target > now) {
+                target = now;
+            }
+
+            // Check if target is within current range (with 2% margin for very smooth scrolling)
+            const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
+            const zoomMs = currentZoom.hours * 60 * 60 * 1000;
+            const margin = zoomMs * 0.02; // 2% margin - reloads very frequently for smooth appearance
+
+            const isInRange = target >= new Date(timelineStartTime.getTime() + margin) &&
+                             target <= new Date(timelineEndTime.getTime() - margin);
+
+            if (!isInRange) {
+                // Target is outside range, reload timeline centered on target
+                setupTimeline(target.toISOString());
+            } else {
+                // Target is in range, just update the display
+                centerTime = target;
+                updateCurrentTimeDisplay(target);
+            }
+        }
+
+        // Track zoom direction for animations
+        let lastZoomIndex = zoomLevelIndex;
+
+        function updateTimelineLabels(animate = true) {
+            const container = document.getElementById('timelineScale');
+
+            // Determine zoom direction
+            const isZoomingIn = zoomLevelIndex < lastZoomIndex; // smaller index = more zoomed in
+            const isZoomingOut = zoomLevelIndex > lastZoomIndex;
+            lastZoomIndex = zoomLevelIndex;
+
+            const containerWidth = container.offsetWidth;
+            const centerX = containerWidth / 2;
+
+            // Calculate old positions before transition
+            const oldLabels = container.querySelectorAll('span:not(.icon):not(#currentTimeDisplay)');
+            const oldPositions = Array.from(oldLabels).map(label => {
+                const rect = label.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                return rect.left - containerRect.left + (rect.width / 2); // center of label
+            });
+
+            if (animate) {
+                // Mark old labels and animate them moving away/together
+                oldLabels.forEach((label, index) => {
+                    label.classList.add('removing');
+                    const labelCenter = oldPositions[index];
+                    const distanceFromCenter = labelCenter - centerX;
+
+                    // Zoom IN: labels move OUTWARD (away from center)
+                    // Zoom OUT: labels move INWARD (toward center)
+                    const moveDistance = isZoomingIn ? distanceFromCenter * 0.5 : -distanceFromCenter * 0.3;
+
+                    setTimeout(() => {
+                        label.style.opacity = '0';
+                        label.style.transform = `translateX(${moveDistance}px) scale(${isZoomingOut ? 0.9 : 1.1})`;
+                    }, index * 5); // Slower stagger: 2ms → 5ms
+                });
+            } else {
+                // No animation - instantly remove old labels
+                oldLabels.forEach(label => {
+                    label.classList.add('removing');
+                    label.style.opacity = '0';
+                });
+            }
+
+            // Generate new labels immediately
+            const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
+            const interval = currentZoom.interval;
+            const totalDuration = timelineEndTime - timelineStartTime;
+            const numLabels = Math.floor(totalDuration / interval) + 1;
+
+            for (let i = 0; i < numLabels; i++) {
+                const time = new Date(timelineStartTime.getTime() + (i * interval));
+
+                if (time <= timelineEndTime) {
+                    const span = document.createElement('span');
+                    span.textContent = formatTimeLabel(time, currentZoom);
+                    span.style.opacity = '0';
+                    span.style.transform = 'scale(0.9)';
+                    container.appendChild(span);
+                }
+            }
+
+            if (animate) {
+                // Fade in new labels - they slide into position
+                setTimeout(() => {
+                    const newLabels = container.querySelectorAll('span:not(.icon):not(#currentTimeDisplay):not(.removing)');
+                    newLabels.forEach((label, index) => {
+                        setTimeout(() => {
+                            label.style.opacity = '1';
+                            label.style.transform = 'scale(1)';
+                        }, index * 20); // Slower stagger: 10ms → 20ms
+                    });
+                }, 100); // Delay before starting: 50ms → 100ms
+
+                // Remove old labels after animation
+                setTimeout(() => {
+                    oldLabels.forEach(label => label.remove());
+                }, 900); // Wait longer: 500ms → 900ms
+            } else {
+                // No animation - instantly show new labels and remove old ones
+                const newLabels = container.querySelectorAll('span:not(.icon):not(#currentTimeDisplay):not(.removing)');
+                newLabels.forEach(label => {
+                    label.style.opacity = '1';
+                    label.style.transform = 'scale(1)';
+                });
+                oldLabels.forEach(label => label.remove());
+            }
+        }
+
+        function updateTimelineTicks(animate = true) {
+            const container = document.getElementById('timelineTicks');
+
+            // Determine zoom direction
+            const isZoomingIn = zoomLevelIndex < lastZoomIndex;
+            const isZoomingOut = zoomLevelIndex > lastZoomIndex;
+
+            const containerWidth = container.offsetWidth;
+            const centerX = containerWidth / 2;
+
+            // Mark old ticks
+            const oldTicks = container.querySelectorAll('.tick');
+
+            if (animate) {
+                // Animate old ticks moving
+                oldTicks.forEach((tick, index) => {
+                    tick.classList.add('removing');
+                    const tickPosition = parseFloat(tick.style.left) / 100 * containerWidth;
+                    const distanceFromCenter = tickPosition - centerX;
+
+                    // Zoom IN: ticks move OUTWARD (away from center)
+                    // Zoom OUT: ticks move INWARD (toward center)
+                    const moveDistance = isZoomingIn ? distanceFromCenter * 0.5 : -distanceFromCenter * 0.3;
+
+                    setTimeout(() => {
+                        tick.style.opacity = '0';
+                        tick.style.transform = `translateX(${moveDistance}px) scaleY(${isZoomingOut ? 0.5 : 1.3})`;
+                    }, index * 1); // Slower stagger: 0.5ms → 1ms
+                });
+            } else {
+                // No animation - instantly remove old ticks
+                oldTicks.forEach(tick => {
+                    tick.classList.add('removing');
+                    tick.style.opacity = '0';
+                });
+            }
+
+            // Generate new ticks immediately
+            const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
+            const totalDuration = timelineEndTime - timelineStartTime;
+
+            // Generate minor ticks
+            const minorInterval = currentZoom.minorInterval;
+            const numMinorTicks = Math.floor(totalDuration / minorInterval);
+
+            for (let i = 0; i <= numMinorTicks; i++) {
+                const time = new Date(timelineStartTime.getTime() + (i * minorInterval));
+                if (time <= timelineEndTime) {
+                    const position = ((time - timelineStartTime) / totalDuration) * 100;
+                    const tick = document.createElement('div');
+                    tick.className = 'tick minor';
+                    tick.style.left = position + '%';
+                    tick.style.opacity = '0';
+                    tick.style.transform = 'scaleY(0.5)';
+                    container.appendChild(tick);
+                }
+            }
+
+            // Generate major ticks
+            const majorInterval = currentZoom.interval;
+            const numMajorTicks = Math.floor(totalDuration / majorInterval);
+
+            for (let i = 0; i <= numMajorTicks; i++) {
+                const time = new Date(timelineStartTime.getTime() + (i * majorInterval));
+                if (time <= timelineEndTime) {
+                    const position = ((time - timelineStartTime) / totalDuration) * 100;
+                    const tick = document.createElement('div');
+                    tick.className = 'tick major';
+                    tick.style.left = position + '%';
+                    tick.style.opacity = '0';
+                    tick.style.transform = 'scaleY(0.5)';
+                    container.appendChild(tick);
+                }
+            }
+
+            if (animate) {
+                // Fade in new ticks - they grow into position
+                setTimeout(() => {
+                    const newTicks = container.querySelectorAll('.tick:not(.removing)');
+                    newTicks.forEach((tick, index) => {
+                        setTimeout(() => {
+                            tick.style.opacity = '1';
+                            tick.style.transform = 'scaleY(1)';
+                        }, index * 2); // Slower stagger: 1ms → 2ms
+                    });
+                }, 100); // Delay before starting: 50ms → 100ms
+
+                // Remove old ticks after animation
+                setTimeout(() => {
+                    oldTicks.forEach(tick => tick.remove());
+                }, 900); // Wait longer: 500ms → 900ms
+            } else {
+                // No animation - instantly show new ticks and remove old ones
+                const newTicks = container.querySelectorAll('.tick:not(.removing)');
+                newTicks.forEach(tick => {
+                    tick.style.opacity = '1';
+                    tick.style.transform = 'scaleY(1)';
+                });
+                oldTicks.forEach(tick => tick.remove());
+            }
+        }
+
+        function formatTimeLabel(date, zoom) {
+            const hours = date.getHours();
+            const minutes = date.getMinutes();
+            const seconds = date.getSeconds();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12;
+
+            // If zoom is not provided, use current zoom level
+            if (!zoom) {
+                zoom = ZOOM_LEVELS[zoomLevelIndex];
+            }
+
+            // Format based on zoom level
+            if (zoom.hours < 0.1) {
+                // Very short zoom (1 min, 5 min) - show seconds
+                return `${displayHours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            } else if (zoom.hours >= 168) {
+                // 1 week zoom - show month and day (MMM DD)
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return `${months[date.getMonth()]} ${date.getDate()}`;
+            } else if (zoom.hours >= 24) {
+                // 1 day zoom - show hours:minutes (HH:MM AM/PM)
+                return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+            } else {
+                // Normal zoom - show hours:minutes
+                return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+            }
+        }
+
+        function drawSequenceBars() {
+            const container = document.getElementById('timelineSequences');
+            container.innerHTML = '';
+
+            const totalDuration = timelineEndTime - timelineStartTime;
+            const currentTime = lastFrameTime ? lastFrameTime.getTime() : null;
+
+            sequences.forEach((seq, index) => {
+                const seqStart = new Date(seq.timeBegin).getTime();
+                const seqEnd = new Date(seq.timeEnd).getTime();
+
+                // Check if sequence is in visible range
+                if (seqEnd < timelineStartTime || seqStart > timelineEndTime) {
+                    return;
+                }
+
+                const startPercent = Math.max(0, ((seqStart - timelineStartTime) / totalDuration) * 100);
+                const endPercent = Math.min(100, ((seqEnd - timelineStartTime) / totalDuration) * 100);
+
+                // If this is the current sequence and we have a current time within it, split the bar
+                if (index === currentSequenceIndex && currentTime && currentTime >= seqStart && currentTime <= seqEnd) {
+                    const currentPercent = ((currentTime - timelineStartTime) / totalDuration) * 100;
+
+                    // Draw green portion (played)
+                    if (currentPercent > startPercent) {
+                        const playedBar = document.createElement('div');
+                        playedBar.className = 'sequence-bar current';
+                        playedBar.style.left = startPercent + '%';
+                        playedBar.style.width = (currentPercent - startPercent) + '%';
+                        playedBar.title = `Sequence ${index + 1}: ${formatTimeLabel(new Date(seqStart), ZOOM_LEVELS[zoomLevelIndex])} - ${formatTimeLabel(new Date(seqEnd), ZOOM_LEVELS[zoomLevelIndex])} (played)`;
+                        container.appendChild(playedBar);
+                    }
+
+                    // Draw gray portion (not yet played)
+                    if (currentPercent < endPercent) {
+                        const unplayedBar = document.createElement('div');
+                        unplayedBar.className = 'sequence-bar';
+                        unplayedBar.style.left = currentPercent + '%';
+                        unplayedBar.style.width = (endPercent - currentPercent) + '%';
+                        unplayedBar.title = `Sequence ${index + 1}: ${formatTimeLabel(new Date(seqStart), ZOOM_LEVELS[zoomLevelIndex])} - ${formatTimeLabel(new Date(seqEnd), ZOOM_LEVELS[zoomLevelIndex])} (upcoming)`;
+                        container.appendChild(unplayedBar);
+                    }
+                } else {
+                    // Draw single bar for non-current sequences or when we don't have timing info
+                    const bar = document.createElement('div');
+                    bar.className = 'sequence-bar';
+                    if (index === currentSequenceIndex) {
+                        bar.classList.add('current');
+                    }
+                    bar.style.left = startPercent + '%';
+                    bar.style.width = (endPercent - startPercent) + '%';
+                    bar.title = `Sequence ${index + 1}: ${formatTimeLabel(new Date(seqStart), ZOOM_LEVELS[zoomLevelIndex])} - ${formatTimeLabel(new Date(seqEnd), ZOOM_LEVELS[zoomLevelIndex])}`;
+                    container.appendChild(bar);
+                }
+            });
+        }
+
+        function updateFutureZone() {
+            const futureZone = document.getElementById('timelineFutureZone');
+            const now = new Date();
+
+            // Check if timeline extends into the future
+            if (timelineEndTime > now) {
+                const totalDuration = timelineEndTime - timelineStartTime;
+
+                // Calculate where "now" is on the timeline
+                if (now < timelineStartTime) {
+                    // Entire timeline is in the future - unlikely but handle it
+                    futureZone.style.left = '0%';
+                    futureZone.style.width = '100%';
+                    futureZone.classList.add('visible');
+                } else {
+                    // Now is within the timeline - show future portion
+                    const futureStartPercent = ((now - timelineStartTime) / totalDuration) * 100;
+                    futureZone.style.left = futureStartPercent + '%';
+                    futureZone.style.width = (100 - futureStartPercent) + '%';
+                    futureZone.classList.add('visible');
+                }
+            } else {
+                // Timeline is entirely in the past - no future zone
+                futureZone.classList.remove('visible');
+            }
+        }
+
+        function updateTimelineMarker(currentTime) {
+            const marker = document.getElementById('timelineMarker');
+            const totalDuration = timelineEndTime - timelineStartTime;
+            const position = ((currentTime - timelineStartTime) / totalDuration) * 100;
+
+            if (position >= 0 && position <= 100) {
+                marker.style.left = position + '%';
+                marker.style.display = 'block';
+            } else {
+                marker.style.display = 'none';
+            }
+        }
+
+        function seekTimeline(event) {
+            if (!isPlaying) return;
+
+            const rect = event.currentTarget.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const percent = x / rect.width;
+
+            const totalDuration = timelineEndTime - timelineStartTime;
+            const targetTime = new Date(timelineStartTime.getTime() + totalDuration * percent);
+
+            console.log('Seek to:', targetTime.toISOString());
+
+            // Find sequence and jump
+            const seqIndex = findSequenceForTime(targetTime.toISOString());
+            if (seqIndex >= 0) {
+                jumpToSequence(seqIndex);
+            }
+        }
+
+        async function initiateWebRTC(cameraId, playbackTime) {
+            // Create peer connection
+            pc = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            });
+
+            // Set up video track handler FIRST
+            pc.ontrack = (event) => {
+                console.log('Video track received');
+                const video = document.getElementById('video');
+                if (event.streams[0]) {
+                    video.srcObject = event.streams[0];
+
+                    // Start frame tracking
+                    video.onloadeddata = () => {
+                        if (video.requestVideoFrameCallback) {
+                            video.requestVideoFrameCallback(onFrameReceived);
+                        }
+                    };
+                }
+            };
+
+            // Connection state monitoring
+            pc.onconnectionstatechange = () => {
+                console.log('Connection state:', pc.connectionState);
+                document.getElementById('state').textContent = pc.connectionState;
+
+                if (pc.connectionState === 'connected') {
+                    showLoading(false);
+                } else if (pc.connectionState === 'failed') {
+                    showError('Connection failed');
+                }
+            };
+
+            // Request session
+            const response = await fetch(`/api/v1/cameras/${cameraId}/playback/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    playbackTime: playbackTime,
+                    skipGaps: true,
+                    speed: currentSpeed
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                let errorMsg = `HTTP ${response.status}`;
+
+                if (response.status === 404) {
+                    errorMsg = 'No recording available at this time. Try selecting an earlier time from the calendar.';
+                } else if (response.status === 500) {
+                    errorMsg = errorData.error || errorData.message || 'Server error. No recording found at this time. Try an earlier time.';
+                }
+
+                throw new Error(errorMsg);
+            }
+
+            const session = await response.json();
+            sessionId = session.sessionId;
+
+            // Set remote description
+            const offerSDP = JSON.parse(session.offerSDP);
+            await pc.setRemoteDescription(new RTCSessionDescription(offerSDP));
+
+            // Create data channel
+            const dataChannel = pc.createDataChannel("commands", { protocol: "videoos-commands" });
+            dataChannel.onopen = () => console.log('Data channel opened');
+            dataChannel.onerror = (err) => console.error('Data channel error:', err);
+
+            // Create answer
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            // Send answer
+            await fetch('/api/v1/playback/webrtc/answer', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: sessionId,
+                    answerSDP: JSON.stringify(pc.localDescription)
+                })
+            });
+
+            // Handle ICE candidates
+            pc.onicecandidate = async (event) => {
+                if (event.candidate && sessionId) {
+                    await fetch('/api/v1/playback/webrtc/ice', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionId: sessionId,
+                            candidate: event.candidate.toJSON()
+                        })
+                    });
+                }
+            };
+
+            // Poll for server ICE candidates
+            pollICECandidates();
+        }
+
+        async function pollICECandidates() {
+            if (!sessionId || !pc) return;
+
+            try {
+                const resp = await fetch(`/api/v1/playback/webrtc/ice/${sessionId}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.candidates && data.candidates.length > 0) {
+                        for (const candidate of data.candidates) {
+                            if (pc && pc.remoteDescription) {
+                                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('ICE polling error:', err);
+            }
+
+            // Continue polling if not connected
+            if (pc && pc.connectionState !== 'connected') {
+                setTimeout(pollICECandidates, 500);
+            }
+        }
+
+        function onFrameReceived(now, metadata) {
+            const video = document.getElementById('video');
+
+            // Calculate current time from RTP timestamp
+            const frameDate = new Date(frameStartTime + metadata.rtpTimestamp);
+            lastFrameTime = frameDate;
+
+            // Update timeline center (reloads if approaching edge)
+            updateTimelineCenter(frameDate);
+
+            // Timeline marker removed - only fixed center line is used
+
+            // Update FPS
+            frameCount++;
+            const elapsed = Date.now() - lastFpsUpdate;
+            if (elapsed >= 1000) {
+                const fps = Math.round(frameCount / (elapsed / 1000));
+                document.getElementById('fps').textContent = fps;
+                frameCount = 0;
+                lastFpsUpdate = Date.now();
+
+                // Update future zone once per second
+                updateFutureZone();
+            }
+
+            // Update sequence indicator
+            highlightCurrentSequence(frameDate);
+
+            // Re-register for next frame
+            if (video && video.readyState >= 2) {
+                video.requestVideoFrameCallback(onFrameReceived);
+            }
+        }
+
+        function updateCurrentTimeDisplay(time) {
+            // Show the center time of the timeline (set once)
+            const displayTime = new Date(time);
+            const hours = displayTime.getHours();
+            const minutes = displayTime.getMinutes();
+            const seconds = displayTime.getSeconds();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12;
+
+            const timeStr = `${displayHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${ampm}`;
+            const dateStr = `${displayTime.getFullYear()}-${(displayTime.getMonth()+1).toString().padStart(2, '0')}-${displayTime.getDate().toString().padStart(2, '0')}`;
+
+            const fullDisplay = `${timeStr} ${dateStr}`;
+            document.getElementById('currentTimeDisplay').textContent = fullDisplay;
+            document.getElementById('collapsedTimeDisplay').textContent = fullDisplay;
+        }
+
+        function highlightCurrentSequence(time) {
+            const newIndex = findSequenceForTime(time.toISOString());
+            if (newIndex !== currentSequenceIndex) {
+                currentSequenceIndex = newIndex;
+                document.getElementById('seqNum').textContent = `${currentSequenceIndex + 1} / ${sequences.length}`;
+
+                // Reload timeline to center on new sequence start
+                const seq = sequences[newIndex];
+                if (seq) {
+                    setupTimeline(seq.timeBegin, true); // Center on new sequence with animation
+                }
+
+                drawSequenceBars();
+                updateFutureZone();
+            }
+        }
+
+        async function togglePlay() {
+            const video = document.getElementById('video');
+
+            if (isPlaying) {
+                // Pause
+                if (video && video.srcObject) {
+                    video.pause();
+                }
+                isPlaying = false;
+                updatePlayButton();
+            } else {
+                // Play - check if WebRTC is connected
+                if (!video || !video.srcObject) {
+                    // No WebRTC connection yet - start it
+                    if (timelineReady) {
+                        await actuallyStartPlayback();
+                    } else {
+                        showError('Please load the timeline first');
+                        return;
+                    }
+                } else {
+                    // Already connected - just resume
+                    video.play();
+                    isPlaying = true;
+                    updatePlayButton();
+                }
+            }
+        }
+
+        function updatePlayButton() {
+            document.getElementById('playBtn').innerHTML = isPlaying ? '&#10074;&#10074;' : '&#9654;';
+        }
+
+        function stepBackward() {
+            // TODO: Implement frame stepping
+            console.log('Step backward');
+        }
+
+        function stepForward() {
+            // TODO: Implement frame stepping
+            console.log('Step forward');
+        }
+
+        async function skipBackward() {
+            if (currentSequenceIndex > 0) {
+                await jumpToSequence(currentSequenceIndex - 1);
+            }
+        }
+
+        async function skipForward() {
+            if (currentSequenceIndex < sequences.length - 1) {
+                await jumpToSequence(currentSequenceIndex + 1);
+            }
+        }
+
+        async function jumpToSequence(index) {
+            if (index < 0 || index >= sequences.length) return;
+
+            const seq = sequences[index];
+            const newTime = new Date(seq.timeBegin);
+
+            console.log(`Jumping to sequence ${index + 1}: ${newTime.toISOString()}`);
+
+            // Remember if we were playing
+            const wasPlaying = isPlaying;
+
+            // Stop current playback
+            stopPlayback();
+
+            // Wait a moment
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Reload timeline centered on new sequence (NO animation for navigation)
+            await initializeTimeline(newTime.toISOString(), false);
+
+            // If we were playing, start playback again
+            if (wasPlaying && timelineReady) {
+                await actuallyStartPlayback();
+            }
+        }
+
+        function stopPlayback() {
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+
+            const video = document.getElementById('video');
+            if (video.srcObject) {
+                video.srcObject = null;
+            }
+
+            sessionId = null;
+            isPlaying = false;
+            updatePlayButton();
+            document.getElementById('state').textContent = 'Stopped';
+        }
+
+        function zoomIn() {
+            // Plus button: increase range (zoom out)
+            if (zoomLevelIndex < ZOOM_LEVELS.length - 1) {
+                zoomLevelIndex++;
+                updateZoom();
+            }
+        }
+
+        function zoomOut() {
+            // Minus button: decrease range (zoom in)
+            if (zoomLevelIndex > 0) {
+                zoomLevelIndex--;
+                updateZoom();
+            }
+        }
+
+        function updateZoom() {
+            // Update display with proper label
+            const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
+            document.getElementById('zoomDisplay').textContent = currentZoom.label;
+
+            // Sync slider position
+            updateZoomSlider();
+
+            // Update timeline with ANIMATION for zoom operations
+            if (lastFrameTime) {
+                setupTimeline(lastFrameTime.toISOString(), true);
+            } else if (timelineStartTime) {
+                // If no playback yet, use current timeline center
+                const center = new Date((timelineStartTime.getTime() + timelineEndTime.getTime()) / 2);
+                setupTimeline(center.toISOString(), true);
+            }
+        }
+
+        function toggleCollapse() {
+            const bar = document.getElementById('playbackBar');
+            const btn = document.getElementById('collapseBtn');
+            const modal = document.getElementById('datetimeModal');
+            const isCollapsed = bar.classList.toggle('collapsed');
+
+            // Update arrow direction: down when expanded, up when collapsed
+            btn.innerHTML = isCollapsed ? '&#9650;' : '&#9660;';
+
+            // Position modal at top-left when collapsed, center when expanded
+            if (isCollapsed) {
+                modal.classList.add('collapsed-mode');
+            } else {
+                modal.classList.remove('collapsed-mode');
+            }
+        }
+
+        function setMode(mode) {
+            if (mode === 'playback') {
+                document.getElementById('playbackModeBtn').classList.add('active');
+                document.getElementById('liveModeBtn').classList.remove('active');
+            } else {
+                document.getElementById('liveModeBtn').classList.add('active');
+                document.getElementById('playbackModeBtn').classList.remove('active');
+                // TODO: Switch to live mode
+            }
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').classList.toggle('show', show);
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').classList.add('show');
+        }
+
+        function closeError() {
+            document.getElementById('errorMessage').classList.remove('show');
+        }
+
+        function closeConfig() {
+            document.getElementById('configPanel').style.display = 'none';
+        }
+
+        function toggleDiagnostics() {
+            document.getElementById('diagnostics').classList.toggle('show');
+        }
+
+        // Close speed selector when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.speed-btn') && !event.target.closest('.speed-selector')) {
+                document.getElementById('speedSelector').classList.remove('show');
+            }
+        });
+
+        // ===== DATE/TIME PICKER FUNCTIONALITY =====
+
+        // Calendar state
+        let calendarDate = new Date();
+        let selectedDate = new Date();
+
+        function openDateTimePicker() {
+            // Initialize with current playback time
+            if (lastFrameTime) {
+                selectedDate = new Date(lastFrameTime);
+            } else {
+                selectedDate = new Date();
+            }
+            calendarDate = new Date(selectedDate);
+
+            renderCalendar();
+            updateSelectedDateTime();
+            document.getElementById('datetimeModal').classList.add('show');
+        }
+
+        function closeDateTimePicker() {
+            document.getElementById('datetimeModal').classList.remove('show');
+        }
+
+        function renderCalendar() {
+            const year = calendarDate.getFullYear();
+            const month = calendarDate.getMonth();
+
+            // Update month/year display
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            document.getElementById('calendarMonth').textContent = monthNames[month];
+            document.getElementById('calendarYear').textContent = year;
+
+            // Get first day of month and total days
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const prevMonthDays = new Date(year, month, 0).getDate();
+
+            // Get calendar grid (skip headers)
+            const grid = document.getElementById('calendarGrid');
+            const headers = Array.from(grid.querySelectorAll('.calendar-day-header'));
+
+            // Clear existing days
+            grid.innerHTML = '';
+            headers.forEach(h => grid.appendChild(h));
+
+            // Add previous month days
+            for (let i = firstDay - 1; i >= 0; i--) {
+                const day = prevMonthDays - i;
+                addCalendarDay(day, 'other-month', new Date(year, month - 1, day));
+            }
+
+            // Add current month days
+            const today = new Date();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month, day);
+                const isToday = date.toDateString() === today.toDateString();
+                const isSelected = date.toDateString() === selectedDate.toDateString();
+
+                const classes = [];
+                if (isToday) classes.push('today');
+                if (isSelected) classes.push('selected');
+
+                addCalendarDay(day, classes.join(' '), date);
+            }
+
+            // Add next month days
+            const remainingCells = 42 - (firstDay + daysInMonth);
+            for (let day = 1; day <= remainingCells; day++) {
+                addCalendarDay(day, 'other-month', new Date(year, month + 1, day));
+            }
+        }
+
+        function addCalendarDay(day, className, date) {
+            const grid = document.getElementById('calendarGrid');
+            const dayEl = document.createElement('div');
+            dayEl.className = 'calendar-day ' + className;
+            dayEl.textContent = day;
+            dayEl.onclick = () => selectDate(date);
+            grid.appendChild(dayEl);
+        }
+
+        function selectDate(date) {
+            // Keep the time, only change the date
+            selectedDate.setFullYear(date.getFullYear());
+            selectedDate.setMonth(date.getMonth());
+            selectedDate.setDate(date.getDate());
+
+            renderCalendar();
+            updateSelectedDateTime();
+        }
+
+        function changeMonth(delta) {
+            calendarDate.setMonth(calendarDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        function goToToday() {
+            const now = new Date();
+            calendarDate = new Date(now);
+            selectedDate = new Date(now);
+            renderCalendar();
+            updateSelectedDateTime();
+        }
+
+        function updateSelectedDateTime() {
+            const hours = selectedDate.getHours();
+            const minutes = selectedDate.getMinutes();
+            const seconds = selectedDate.getSeconds();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12;
+
+            const timeStr = `${displayHours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} ${ampm}`;
+            const dateStr = selectedDate.toISOString().split('T')[0];
+
+            document.getElementById('selectedDateTime').textContent = `${timeStr}, ${dateStr}`;
+        }
+
+        function showTimePicker() {
+            // TODO: Add time picker UI (hour/minute/second selection)
+            alert('Time picker not yet implemented. Use current time or select date for now.');
+        }
+
+        async function applyDateTime() {
+            // Jump to selected date/time
+            const newTime = selectedDate.toISOString();
+
+            closeDateTimePicker();
+
+            // Find sequence at this time and jump
+            const seqIndex = findSequenceForTime(newTime);
+            if (seqIndex >= 0 && sequences.length > 0) {
+                await jumpToSequence(seqIndex);
+            } else {
+                // Reload sequences for the new date (NO animation for navigation)
+                await initializeTimeline(newTime, false);
+            }
+        }
+
+        function setZoomFromSlider(value) {
+            // Natural slider: left = 1 min (index 0), right = 1 wk (index 9)
+            zoomLevelIndex = parseInt(value);
+            const currentZoom = ZOOM_LEVELS[zoomLevelIndex];
+            document.getElementById('zoomDisplay').textContent = currentZoom.label;
+
+            // Update timeline with ANIMATION for zoom operations
+            if (lastFrameTime) {
+                setupTimeline(lastFrameTime.toISOString(), true);
+            } else if (timelineStartTime) {
+                const center = new Date((timelineStartTime.getTime() + timelineEndTime.getTime()) / 2);
+                setupTimeline(center.toISOString(), true);
+            }
+        }
+
+        function updateZoomSlider() {
+            // Natural slider: left = 1 min (index 0), right = 1 wk (index 9)
+            document.getElementById('zoomSlider').value = zoomLevelIndex;
+        }
+    </script>
+</body>
+</html>

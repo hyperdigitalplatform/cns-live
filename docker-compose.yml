@@ -95,7 +95,7 @@ services:
       - "8085:8080"
     environment:
       # Milestone Configuration
-      MILESTONE_BASE_URL: ${MILESTONE_BASE_URL:-https://192.168.1.11}
+      MILESTONE_BASE_URL: ${MILESTONE_BASE_URL:-https://192.168.1.4}
       MILESTONE_USERNAME: ${MILESTONE_USERNAME:-raam}
       MILESTONE_PASSWORD: ${MILESTONE_PASSWORD:-Ilove#123}
 
@@ -469,9 +469,9 @@ services:
       MINIO_USE_SSL: false
 
       # Milestone VMS (optional - for external recordings)
-      MILESTONE_URL: ${MILESTONE_URL:-}
-      MILESTONE_USERNAME: ${MILESTONE_USERNAME:-}
-      MILESTONE_PASSWORD: ${MILESTONE_PASSWORD:-}
+      MILESTONE_URL: ${MILESTONE_BASE_URL:-http://192.168.1.11:80}
+      MILESTONE_USERNAME: ${MILESTONE_USERNAME:-raam}
+      MILESTONE_PASSWORD: ${MILESTONE_PASSWORD:-Ilove#123}
 
       # Configuration
       WORK_DIR: /tmp/playback

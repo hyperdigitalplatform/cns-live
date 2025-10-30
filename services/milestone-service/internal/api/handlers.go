@@ -317,55 +317,151 @@ func (h *Handler) DiscoverCameras(c *gin.Context) {
 	})
 }
 
-// StreamPlayback handles GET /api/v1/cameras/:cameraId/playback/stream
-// Proxies video stream from Milestone with authentication
-func (h *Handler) StreamPlayback(c *gin.Context) {
+// ============================================================================
+// WebRTC Playback Handlers
+// ============================================================================
+
+// StartWebRTCPlayback handles POST /api/v1/cameras/:cameraId/playback/start
+// Initiates a WebRTC playback session with Milestone
+func (h *Handler) StartWebRTCPlayback(c *gin.Context) {
 	cameraId := c.Param("cameraId")
-	timestampStr := c.Query("time")
 
-	if cameraId == "" {
+	var req WebRTCPlaybackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "invalid_request",
-			Message: "cameraId is required",
+			Message: err.Error(),
 		})
 		return
 	}
 
-	if timestampStr == "" {
+	// Validate playback time
+	if req.PlaybackTime == "" {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "invalid_request",
-			Message: "time parameter is required",
+			Message: "playbackTime is required",
 		})
 		return
 	}
 
-	// Parse the timestamp
-	timestamp, err := time.Parse(time.RFC3339, timestampStr)
+	// Default speed to 1.0 if not specified
+	if req.Speed == 0 {
+		req.Speed = 1.0
+	}
+
+	ctx := context.Background()
+
+	// Create WebRTC session with Milestone
+	session, err := h.restClient.CreateWebRTCPlaybackSession(ctx, rest.WebRTCPlaybackRequest{
+		DeviceID:     cameraId,
+		PlaybackTime: req.PlaybackTime,
+		SkipGaps:     req.SkipGaps,
+		Speed:        req.Speed,
+		StreamID:     req.StreamID,
+		IncludeAudio: false, // Audio not supported in playback for now
+	})
+
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "webrtc_session_failed",
+			Message: fmt.Sprintf("Failed to create WebRTC playback session: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, WebRTCSessionResponse{
+		SessionID: session.SessionID,
+		OfferSDP:  session.OfferSDP,
+	})
+}
+
+// UpdateWebRTCAnswer handles PUT /api/v1/playback/webrtc/answer
+// Updates the WebRTC session with the answer SDP from client
+func (h *Handler) UpdateWebRTCAnswer(c *gin.Context) {
+	var req WebRTCAnswerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "invalid_time_format",
-			Message: "time must be in ISO 8601 format",
+			Error:   "invalid_request",
+			Message: err.Error(),
 		})
 		return
 	}
 
 	ctx := context.Background()
+	err := h.restClient.UpdateWebRTCAnswer(ctx, req.SessionID, req.AnswerSDP)
 
-	// Set headers for video streaming
-	c.Header("Content-Type", "video/mp4")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Accept-Ranges", "bytes")
-
-	// Proxy the stream from Milestone REST API
-	err = h.restClient.ProxyPlaybackStream(ctx, c.Writer, cameraId, timestamp)
 	if err != nil {
-		// Only send error if headers haven't been sent yet
-		if !c.Writer.Written() {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "playback_stream_failed",
-				Message: fmt.Sprintf("Failed to stream playback: %v", err),
-			})
-		}
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "update_failed",
+			Message: fmt.Sprintf("Failed to update WebRTC answer: %v", err),
+		})
 		return
 	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+	})
+}
+
+// SendICECandidate handles POST /api/v1/playback/webrtc/ice
+// Sends an ICE candidate from client to Milestone
+func (h *Handler) SendICECandidate(c *gin.Context) {
+	var req ICECandidateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	ctx := context.Background()
+	err := h.restClient.SendICECandidate(ctx, req.SessionID, req.Candidate)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "ice_failed",
+			Message: fmt.Sprintf("Failed to send ICE candidate: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+	})
+}
+
+// GetICECandidates handles GET /api/v1/playback/webrtc/ice/:sessionId
+// Retrieves ICE candidates from Milestone
+func (h *Handler) GetICECandidates(c *gin.Context) {
+	sessionId := c.Param("sessionId")
+
+	if sessionId == "" {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_request",
+			Message: "sessionId is required",
+		})
+		return
+	}
+
+	ctx := context.Background()
+	candidates, err := h.restClient.GetICECandidates(ctx, sessionId)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "ice_failed",
+			Message: fmt.Sprintf("Failed to get ICE candidates: %v", err),
+		})
+		return
+	}
+
+	// Convert []ICECandidate to []interface{} for JSON response
+	candidateInterfaces := make([]interface{}, len(candidates))
+	for i, c := range candidates {
+		candidateInterfaces[i] = c
+	}
+
+	c.JSON(http.StatusOK, ICECandidatesResponse{
+		Candidates: candidateInterfaces,
+	})
 }
