@@ -107,28 +107,28 @@ export function PTZControls({
       button: 'h-11 w-11',
       icon: 'w-5 h-5',
       gap: 'gap-1.5',
-      padding: 'p-2',
+      padding: 'px-2 pb-2',
     },
     large: {
       container: 'w-14',
       button: 'h-9 w-9',
       icon: 'w-4 h-4',
       gap: 'gap-1',
-      padding: 'p-1.5',
+      padding: 'px-1.5 pb-1.5',
     },
     medium: {
       container: 'w-12',
       button: 'h-8 w-8',
       icon: 'w-3.5 h-3.5',
       gap: 'gap-1',
-      padding: 'p-1',
+      padding: 'px-1 pb-1',
     },
     small: {
       container: 'w-10',
       button: 'h-6 w-6',
       icon: 'w-3 h-3',
       gap: 'gap-0.5',
-      padding: 'p-1',
+      padding: 'px-1 pb-1',
     },
   };
 
@@ -147,7 +147,7 @@ export function PTZControls({
   return (
     <div
       className={cn(
-        'absolute left-0 top-0 bottom-0 flex flex-col bg-black/80 backdrop-blur-md border-r border-white/10 pointer-events-auto z-10',
+        'absolute left-0 top-0 bottom-0 flex flex-col bg-black/80 backdrop-blur-md border-r border-white/10 pointer-events-auto z-10 pt-12',
         size.container,
         size.padding
       )}

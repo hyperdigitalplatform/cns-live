@@ -1,7 +1,7 @@
 import React, { useState, forwardRef, useImperativeHandle, useRef, useCallback } from 'react';
 import { LiveStreamPlayer } from './LiveStreamPlayer';
 import { RecordingPlayer } from './RecordingPlayer';
-import { PlaybackModeToggle, PlaybackControlBar } from './playback';
+import { PlaybackControlBar } from './playback';
 import { SaveLayoutDialog } from './SaveLayoutDialog';
 import { LoadLayoutDropdown } from './LoadLayoutDropdown';
 import { LayoutManagerDialog } from './LayoutManagerDialog';
@@ -91,6 +91,7 @@ interface GridCell {
     speed: number;
     zoomLevel: number;
     timelineData: TimelineData | null;
+    currentSequenceIndex: number; // Track which sequence is currently playing
   };
 }
 
@@ -149,6 +150,7 @@ function initializePlaybackState() {
     speed: 1.0,
     zoomLevel: 12, // 12 hours
     timelineData: null,
+    currentSequenceIndex: -1, // -1 means no sequence playing
   };
 }
 
@@ -353,6 +355,12 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
             const newCells = [...prev];
             if (newCells[index].playbackState) {
               newCells[index].playbackState!.timelineData = transformedData;
+
+              // Initialize current sequence index
+              if (transformedData.sequences.length > 0) {
+                const currentTime = newCells[index].playbackState!.currentTime;
+                newCells[index].playbackState!.currentSequenceIndex = findSequenceForTime(transformedData.sequences, currentTime);
+              }
             }
             return newCells;
           });
@@ -361,12 +369,68 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
           showError('Failed to load recordings');
         }
       } else {
-        // Just switch mode
+        // Switch mode and reset to current time
+        const now = new Date();
+        const newStartTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const newEndTime = now;
+
         setGridCells((prev) => {
           const newCells = [...prev];
           newCells[index].playbackState!.mode = 'playback';
+          newCells[index].playbackState!.currentTime = now;
+          newCells[index].playbackState!.startTime = newStartTime;
+          newCells[index].playbackState!.endTime = newEndTime;
+          newCells[index].playbackState!.isPlaying = false; // Reset to paused
           return newCells;
         });
+
+        // Refetch timeline data for new time range
+        if (cell.camera) {
+          (async () => {
+            try {
+              const data = await api.getMilestoneSequences({
+                cameraId: cell.camera!.id,
+                startTime: newStartTime.toISOString(),
+                endTime: newEndTime.toISOString(),
+              });
+
+              // Transform and update timeline data
+              const transformedData: TimelineData = {
+                cameraId: cell.camera!.id,
+                queryRange: {
+                  start: newStartTime.toISOString(),
+                  end: newEndTime.toISOString(),
+                },
+                sequences: data.sequences.map((seq) => ({
+                  sequenceId: `${seq.timeBegin}-${seq.timeEnd}`,
+                  startTime: seq.timeBegin,
+                  endTime: seq.timeEnd,
+                  durationSeconds: (new Date(seq.timeEnd).getTime() - new Date(seq.timeBegin).getTime()) / 1000,
+                  available: true,
+                  sizeBytes: 0,
+                })),
+                gaps: [],
+                totalRecordingSeconds: 0,
+                totalGapSeconds: 0,
+                coverage: data.sequences.length > 0 ? 100 : 0,
+              };
+
+            setGridCells((prev) => {
+              const newCells = [...prev];
+              if (newCells[index].playbackState) {
+                newCells[index].playbackState!.timelineData = transformedData;
+                // Initialize current sequence index
+                if (transformedData.sequences.length > 0) {
+                  newCells[index].playbackState!.currentSequenceIndex = findSequenceForTime(transformedData.sequences, now);
+                }
+              }
+              return newCells;
+            });
+            } catch (error) {
+              console.error('Failed to query recordings on playback re-entry:', error);
+            }
+          })();
+        }
       }
     } else {
       // Switch back to live
@@ -380,6 +444,12 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
     }
   };
 
+  /**
+   * Handle play/pause toggle for a cell
+   * This updates the isPlaying flag which is passed to RecordingPlayer via externalIsPlaying prop.
+   * RecordingPlayer then controls the actual video element play/pause state.
+   * WebRTC session is created automatically by useWebRTCPlayback hook when playbackTime is set.
+   */
   const handlePlayPause = (index: number) => {
     setGridCells((prev) => {
       const newCells = [...prev];
@@ -390,34 +460,73 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
     });
   };
 
+  /**
+   * Find which sequence contains the given time
+   */
+  const findSequenceForTime = (sequences: any[], time: Date): number => {
+    const timestamp = time.getTime();
+
+    for (let i = 0; i < sequences.length; i++) {
+      const seqStart = new Date(sequences[i].startTime).getTime();
+      const seqEnd = new Date(sequences[i].endTime).getTime();
+
+      if (timestamp >= seqStart && timestamp <= seqEnd) {
+        return i;
+      }
+
+      // If time is before this sequence, use this sequence
+      if (timestamp < seqStart) {
+        return i;
+      }
+    }
+
+    // Time is after all sequences - use last sequence
+    return sequences.length - 1;
+  };
+
   const handleSeek = useCallback((index: number, newTime: Date, immediate = false) => {
     const cell = gridCells[index];
     if (!cell.camera || !cell.playbackState) return;
 
-    // Clear existing debounce timer for this cell
-    const existingTimer = seekDebounceTimers.current.get(index);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-    }
+    // Find which sequence this time belongs to
+    const sequences = cell.playbackState.timelineData?.sequences || [];
+    const newSeqIndex = sequences.length > 0 ? findSequenceForTime(sequences, newTime) : -1;
 
-    // If immediate seek (e.g., from timeline click), update right away
+    // If immediate seek (e.g., from timeline click or frame update during playback)
+    // Update without debounce
     if (immediate) {
+      // Clear any existing debounce timer for this cell
+      const existingTimer = seekDebounceTimers.current.get(index);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        seekDebounceTimers.current.delete(index);
+      }
+
       setGridCells((prev) => {
         const newCells = [...prev];
         if (newCells[index].playbackState) {
           newCells[index].playbackState!.currentTime = newTime;
+          newCells[index].playbackState!.currentSequenceIndex = newSeqIndex;
         }
         return newCells;
       });
       return;
     }
 
-    // Otherwise, debounce the seek operation (500ms delay)
+    // For timeline drag operations, debounce to avoid excessive updates
+    // Clear existing debounce timer for this cell
+    const existingTimer = seekDebounceTimers.current.get(index);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    // Debounce the seek operation (500ms delay)
     const timer = setTimeout(() => {
       setGridCells((prev) => {
         const newCells = [...prev];
         if (newCells[index].playbackState) {
           newCells[index].playbackState!.currentTime = newTime;
+          newCells[index].playbackState!.currentSequenceIndex = newSeqIndex;
         }
         return newCells;
       });
@@ -427,30 +536,48 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
     seekDebounceTimers.current.set(index, timer);
   }, [gridCells]);
 
-  const handleScrollTimeline = (index: number, direction: 'left' | 'right') => {
+  /**
+   * Handle forward/backward sequence jump (like test-webrtc-playback.html)
+   * This properly stops the current WebRTC session and jumps to the next/previous sequence
+   */
+  const handleScrollTimeline = useCallback((index: number, direction: 'left' | 'right') => {
     const cell = gridCells[index];
-    if (!cell.playbackState) return;
+    if (!cell.playbackState?.timelineData?.sequences) return;
 
-    const scrollAmount = cell.playbackState.zoomLevel * 60 * 60 * 1000; // zoom level in ms
+    const sequences = cell.playbackState.timelineData.sequences;
+    const currentSeqIndex = cell.playbackState.currentSequenceIndex;
 
+    // Calculate target sequence index
+    const targetIndex = direction === 'left'
+      ? currentSeqIndex - 1
+      : currentSeqIndex + 1;
+
+    // Check bounds
+    if (targetIndex < 0 || targetIndex >= sequences.length) {
+      console.log(`Cannot jump ${direction}: ${targetIndex < 0 ? 'already at first sequence' : 'already at last sequence'}`);
+      return;
+    }
+
+    // Get target sequence
+    const targetSeq = sequences[targetIndex];
+    const newTime = new Date(targetSeq.startTime);
+
+    console.log(`Jumping from sequence ${currentSeqIndex} to ${targetIndex} at ${newTime.toISOString()}`);
+
+    // Update state to trigger WebRTC session restart
+    // IMPORTANT: Pause playback when user manually navigates (Solution 1)
+    // This prevents auto-play from interfering with backward navigation
+    // User must click play button to resume
     setGridCells((prev) => {
       const newCells = [...prev];
       if (newCells[index].playbackState) {
-        const state = newCells[index].playbackState!;
-        state.startTime = new Date(
-          direction === 'left'
-            ? state.startTime.getTime() - scrollAmount
-            : state.startTime.getTime() + scrollAmount
-        );
-        state.endTime = new Date(
-          direction === 'left'
-            ? state.endTime.getTime() - scrollAmount
-            : state.endTime.getTime() + scrollAmount
-        );
+        newCells[index].playbackState!.isPlaying = false; // Pause on manual navigation
+        newCells[index].playbackState!.currentTime = newTime;
+        newCells[index].playbackState!.currentSequenceIndex = targetIndex;
       }
       return newCells;
     });
-  };
+  }, [gridCells]);
 
   const handleZoomChange = (index: number, newZoomLevel: number) => {
     const cell = gridCells[index];
@@ -468,6 +595,27 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
       }
       return newCells;
     });
+  };
+
+  const handleSpeedChange = (index: number, newSpeed: number) => {
+    const cell = gridCells[index];
+    if (!cell.playbackState) return;
+
+    setGridCells((prev) => {
+      const newCells = [...prev];
+      if (newCells[index].playbackState) {
+        newCells[index].playbackState!.speed = newSpeed;
+      }
+      return newCells;
+    });
+
+    // TODO: Send speed change to backend API when implemented
+    // const sessionId = cell.playbackState.sessionId;
+    // await fetch(`/api/v1/playback/speed/${sessionId}`, {
+    //   method: 'PUT',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ speed: newSpeed })
+    // });
   };
 
   const hasRecordingAtCurrentTime = (index: number): boolean => {
@@ -775,7 +923,9 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                       startTime={cell.playbackState.startTime}
                       endTime={cell.playbackState.endTime}
                       initialPlaybackTime={cell.playbackState.currentTime}
-                      onPlaybackTimeChange={(time) => handleSeek(index, time)}
+                      externalIsPlaying={cell.playbackState.isPlaying}
+                      externalCurrentTime={cell.playbackState.currentTime}
+                      onPlaybackTimeChange={(time) => handleSeek(index, time, true)}
                       onPlaybackStateChange={(state) => {
                         if (state === 'playing' && !cell.playbackState!.isPlaying) {
                           handlePlayPause(index);
@@ -807,14 +957,6 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                           </p>
                         )}
                       </div>
-                      {/* Mode Toggle - only show if camera has milestone_device_id */}
-                      {cell.camera.milestone_device_id && (
-                        <PlaybackModeToggle
-                          mode={cell.playbackState?.mode || 'live'}
-                          onChange={(mode) => handleModeChange(index, mode)}
-                          className="flex-shrink-0"
-                        />
-                      )}
                     </div>
                   </div>
 
@@ -837,21 +979,23 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                   </div>
 
                   {/* Playback Controls */}
-                  {cell.playbackState?.mode === 'playback' &&
-                   cell.playbackState.timelineData && (
+                  {cell.camera.milestone_device_id && (
                     <div className="absolute bottom-0 left-0 right-0 z-30">
                       <PlaybackControlBar
-                        startTime={cell.playbackState.startTime}
-                        endTime={cell.playbackState.endTime}
-                        currentTime={cell.playbackState.currentTime}
-                        sequences={cell.playbackState.timelineData.sequences}
-                        isPlaying={cell.playbackState.isPlaying}
-                        zoomLevel={cell.playbackState.zoomLevel}
+                        startTime={cell.playbackState?.startTime}
+                        endTime={cell.playbackState?.endTime}
+                        currentTime={cell.playbackState?.currentTime}
+                        sequences={cell.playbackState?.timelineData?.sequences || []}
+                        isPlaying={cell.playbackState?.isPlaying}
+                        zoomLevel={cell.playbackState?.zoomLevel}
                         onPlayPause={() => handlePlayPause(index)}
                         onSeek={(time) => handleSeek(index, time, true)}
                         onScrollTimeline={(direction) => handleScrollTimeline(index, direction)}
                         onZoomChange={(zoom) => handleZoomChange(index, zoom)}
+                        onSpeedChange={(speed) => handleSpeedChange(index, speed)}
                         hasRecording={hasRecordingAtCurrentTime(index)}
+                        mode={cell.playbackState?.mode || 'live'}
+                        onModeChange={(mode) => handleModeChange(index, mode)}
                       />
                     </div>
                   )}
