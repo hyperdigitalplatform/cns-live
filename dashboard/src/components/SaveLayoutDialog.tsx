@@ -125,8 +125,8 @@ export function SaveLayoutDialog({
               onChange={(e) => setDescription(e.target.value)}
               disabled={saving}
               rows={3}
-              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm
-                placeholder:text-gray-400
+              className="flex w-full rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm text-gray-900 dark:text-text-primary
+                placeholder:text-gray-400 dark:placeholder:text-text-muted
                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                 disabled:cursor-not-allowed disabled:opacity-50"
             />
@@ -140,8 +140,8 @@ export function SaveLayoutDialog({
               <label
                 className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${
                   scope === 'local'
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-300 hover:bg-gray-50'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                    : 'border-gray-300 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-surface'
                 }`}
               >
                 <input
@@ -167,8 +167,8 @@ export function SaveLayoutDialog({
               <label
                 className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${
                   scope === 'global'
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-300 hover:bg-gray-50'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                    : 'border-gray-300 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-surface'
                 }`}
               >
                 <input
@@ -193,17 +193,17 @@ export function SaveLayoutDialog({
             </div>
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-            <div className="text-xs text-gray-600">
+          <div className="bg-gray-50 dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-md p-3">
+            <div className="text-xs text-gray-600 dark:text-text-secondary">
               <div className="flex items-center justify-between">
                 <span>Layout Type:</span>
-                <span className="font-medium text-gray-900 capitalize">
+                <span className="font-medium text-gray-900 dark:text-text-primary capitalize">
                   {layoutType}
                 </span>
               </div>
               <div className="flex items-center justify-between mt-1">
                 <span>Cameras:</span>
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-gray-900 dark:text-text-primary">
                   {cameras.length}
                 </span>
               </div>
@@ -211,7 +211,7 @@ export function SaveLayoutDialog({
           </div>
 
           {error && cameras.length === 0 && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md p-3">
               {error}
             </div>
           )}

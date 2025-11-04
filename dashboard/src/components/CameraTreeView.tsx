@@ -377,8 +377,8 @@ export function CameraTreeView({
         className={cn(
           'flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors group relative',
           isSelected
-            ? 'bg-blue-100 border border-blue-500'
-            : 'hover:bg-gray-100'
+            ? 'bg-blue-100 dark:bg-blue-900/40 border border-blue-500 dark:border-blue-600'
+            : 'hover:bg-gray-100 dark:hover:bg-dark-surface'
         )}
         style={{ paddingLeft: `${depth * 20 + 28}px` }}
       >
@@ -386,11 +386,11 @@ export function CameraTreeView({
         {depth > 0 && (
           <>
             <div
-              className="absolute left-0 top-0 bottom-0 w-px bg-gray-300"
+              className="absolute left-0 top-0 bottom-0 w-px bg-gray-300 dark:bg-dark-border"
               style={{ left: `${(depth - 1) * 20 + 18}px` }}
             />
             <div
-              className="absolute top-1/2 w-3 h-px bg-gray-300"
+              className="absolute top-1/2 w-3 h-px bg-gray-300 dark:bg-dark-border"
               style={{ left: `${(depth - 1) * 20 + 18}px` }}
             />
           </>
@@ -400,7 +400,7 @@ export function CameraTreeView({
         ) : (
           <VideoOff className="w-4 h-4 text-gray-400 flex-shrink-0" />
         )}
-        <span className="flex-1 text-sm font-medium text-gray-900 truncate text-left">
+        <span className="flex-1 text-sm font-medium text-gray-900 dark:text-text-primary truncate text-left">
           {camera.name}
         </span>
         <span
@@ -433,9 +433,9 @@ export function CameraTreeView({
           onContextMenu={(e) => handleContextMenu(e, 'folder', folder.id)}
           className={cn(
             'flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors group relative',
-            isSelected && 'bg-blue-50',
-            isDraggedOver && 'bg-blue-100 ring-2 ring-blue-500',
-            'hover:bg-gray-100'
+            isSelected && 'bg-blue-50 dark:bg-blue-900/30',
+            isDraggedOver && 'bg-blue-100 dark:bg-blue-800/30 ring-2 ring-blue-500',
+            'hover:bg-gray-100 dark:hover:bg-dark-surface'
           )}
           style={{ paddingLeft: `${folder.depth * 20 + 8}px` }}
         >
@@ -481,13 +481,13 @@ export function CameraTreeView({
                 className="flex-1 px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             ) : (
-              <span className="text-sm font-medium text-gray-900 truncate text-left">
+              <span className="text-sm font-medium text-gray-900 dark:text-text-primary truncate text-left">
                 {filteredFolder.name}
               </span>
             )}
           </button>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+            <span className="text-xs text-gray-500 dark:text-text-muted bg-gray-200 dark:bg-dark-surface px-2 py-0.5 rounded-full">
               {filteredFolder.cameras.length}
             </span>
             <button
@@ -495,7 +495,7 @@ export function CameraTreeView({
                 e.stopPropagation();
                 handleCreateSubfolder(folder.id);
               }}
-              className="p-1 hover:bg-gray-200 rounded"
+              className="p-1 hover:bg-gray-200 dark:hover:bg-dark-surface rounded"
               title="Add subfolder"
             >
               <FolderPlus className="w-3.5 h-3.5 text-gray-600" />
@@ -536,22 +536,22 @@ export function CameraTreeView({
       {unorganizedCameras.length > 0 && (
         <div
           className={cn(
-            dragOver === 'unorganized' && 'bg-blue-50 ring-2 ring-blue-500'
+            dragOver === 'unorganized' && 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500'
           )}
           onDragOver={(e) => handleDragOver(e, 'unorganized')}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, null)}
         >
-          <div className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-gray-100 cursor-pointer transition-colors group"
+          <div className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-dark-surface cursor-pointer transition-colors group"
             style={{ paddingLeft: '8px' }}
           >
-            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 invisible" />
-            <Folder className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <span className="text-sm font-medium text-gray-600 truncate text-left">
+            <ChevronRight className="w-4 h-4 text-gray-400 dark:text-text-muted flex-shrink-0 invisible" />
+            <Folder className="w-4 h-4 text-gray-400 dark:text-text-muted flex-shrink-0" />
+            <span className="text-sm font-medium text-gray-600 dark:text-text-secondary truncate text-left">
               Unorganized
             </span>
             <div className="flex items-center gap-1 opacity-100 transition-opacity ml-auto">
-              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+              <span className="text-xs text-gray-500 dark:text-text-muted bg-gray-200 dark:bg-dark-surface px-2 py-0.5 rounded-full">
                 {unorganizedCameras.length}
               </span>
             </div>
@@ -565,7 +565,7 @@ export function CameraTreeView({
       {/* Context menu */}
       {contextMenu && (
         <div
-          className="fixed bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 min-w-[160px]"
+          className="fixed bg-white dark:bg-dark-sidebar rounded-lg shadow-lg border border-gray-200 dark:border-dark-border py-1 z-50 min-w-[160px]"
           style={{
             left: contextMenu.x,
             top: contextMenu.y,
@@ -576,14 +576,14 @@ export function CameraTreeView({
             <>
               <button
                 onClick={() => handleAddCamera(contextMenu.id)}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-text-primary hover:bg-gray-100 dark:hover:bg-dark-surface flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Add Camera
               </button>
               <button
                 onClick={() => handleCreateSubfolder(contextMenu.id)}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-text-primary hover:bg-gray-100 dark:hover:bg-dark-surface flex items-center gap-2"
               >
                 <FolderPlus className="w-4 h-4" />
                 Add Subfolder
@@ -601,7 +601,7 @@ export function CameraTreeView({
                   const folder = findFolder(folderTrees);
                   if (folder) handleRenameFolder(folder.id, folder.name, folder.name_ar);
                 }}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-text-primary hover:bg-gray-100 dark:hover:bg-dark-surface flex items-center gap-2"
               >
                 <Edit2 className="w-4 h-4" />
                 Rename
@@ -619,7 +619,7 @@ export function CameraTreeView({
                   const folder = findFolder(folderTrees);
                   if (folder) handleDeleteFolder(folder.id, folder.name);
                 }}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-dark-surface flex items-center gap-2 text-red-600 dark:text-red-400"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
@@ -635,7 +635,7 @@ export function CameraTreeView({
                       handleRemoveCamera(contextMenu.id, contextMenu.folderId!, camera.name);
                     }
                   }}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-orange-600"
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-dark-surface flex items-center gap-2 text-orange-600 dark:text-orange-400"
                 >
                   <Trash2 className="w-4 h-4" />
                   Remove from Folder
@@ -648,7 +648,7 @@ export function CameraTreeView({
                     handleDeleteCamera(camera.id, camera.name);
                   }
                 }}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-dark-surface flex items-center gap-2 text-red-600 dark:text-red-400"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete Camera
@@ -769,8 +769,8 @@ export function CameraTreeView({
 
           <DialogBody>
             <div className="space-y-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
+              <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">
                   <strong>Warning:</strong> You are about to delete the folder <strong>"{folderName}"</strong>.
                 </p>
               </div>
@@ -823,15 +823,15 @@ export function CameraTreeView({
 
           <DialogBody>
             <div className="space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-sm text-red-800">
+              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                <p className="text-sm text-red-800 dark:text-red-300">
                   <strong>Warning:</strong> You are about to permanently delete the camera <strong>"{currentCameraName}"</strong> and all its associated data.
                 </p>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-text-secondary">
                 This will remove:
               </p>
-              <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
+              <ul className="text-sm text-gray-600 dark:text-text-secondary list-disc pl-5 space-y-1">
                 <li>Camera configuration and settings</li>
                 <li>All associated stream data</li>
                 <li>Camera from all folders</li>
@@ -884,15 +884,15 @@ export function CameraTreeView({
 
           <DialogBody>
             <div className="space-y-4">
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <p className="text-sm text-orange-800">
+              <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-700 rounded-lg p-4">
+                <p className="text-sm text-orange-800 dark:text-orange-300">
                   Remove <strong>"{currentCameraName}"</strong> from this folder?
                 </p>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-text-secondary">
                 The camera will still be accessible from:
               </p>
-              <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
+              <ul className="text-sm text-gray-600 dark:text-text-secondary list-disc pl-5 space-y-1">
                 <li>Other folders it belongs to</li>
                 <li>The unorganized cameras section</li>
                 <li>The camera list</li>
@@ -942,7 +942,7 @@ export function CameraTreeView({
                 autoFocus
               />
 
-              <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
+              <div className="max-h-80 overflow-y-auto border border-gray-200 dark:border-dark-border rounded-lg">
                 {allCameras
                   .filter(camera =>
                     !currentFolderId ||
@@ -962,7 +962,7 @@ export function CameraTreeView({
                     return (
                       <label
                         key={camera.id}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-dark-surface cursor-pointer border-b border-gray-100 dark:border-dark-border last:border-0"
                       >
                         <input
                           type="checkbox"
@@ -976,11 +976,11 @@ export function CameraTreeView({
                           }}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                          <p className="text-sm font-medium text-gray-900 dark:text-text-primary truncate">
                             {camera.name}
                           </p>
                           {camera.name_ar && (
-                            <p className="text-xs text-gray-500 truncate">
+                            <p className="text-xs text-gray-500 dark:text-text-muted truncate">
                               {camera.name_ar}
                             </p>
                           )}
@@ -1002,7 +1002,7 @@ export function CameraTreeView({
                   camera.name_ar?.includes(searchCameraQuery) ||
                   camera.id.toLowerCase().includes(searchCameraQuery.toLowerCase())
                 ).length === 0 && (
-                  <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                  <div className="px-4 py-8 text-center text-gray-500 dark:text-text-muted text-sm">
                     No cameras found
                   </div>
                 )}

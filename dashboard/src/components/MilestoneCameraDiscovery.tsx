@@ -164,7 +164,7 @@ export function MilestoneCameraDiscovery({
         <DialogBody>
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-red-800 dark:text-red-300 text-sm">
               <strong>Error:</strong> {error}
             </div>
           )}
@@ -174,8 +174,8 @@ export function MilestoneCameraDiscovery({
             <div
               className={`mb-4 p-4 rounded-lg text-sm ${
                 importResult.failed === 0
-                  ? 'bg-green-50 border border-green-200 text-green-800'
-                  : 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+                  ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 text-green-800 dark:text-green-300'
+                  : 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300'
               }`}
             >
               <strong>Import Complete:</strong> {importResult.imported} imported,{' '}
@@ -194,13 +194,13 @@ export function MilestoneCameraDiscovery({
           <div className="space-y-4 mb-4">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-text-muted" />
                 <input
                   type="text"
                   placeholder="Search cameras by name, ID, or IP..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-lg text-sm bg-white dark:bg-dark-surface text-gray-900 dark:text-text-primary placeholder:text-gray-400 dark:placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -231,8 +231,8 @@ export function MilestoneCameraDiscovery({
 
           {/* Selection Actions */}
           {selectedCount > 0 && (
-            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg mb-4">
-              <span className="text-sm text-blue-900 font-medium">
+            <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg mb-4">
+              <span className="text-sm text-blue-900 dark:text-blue-300 font-medium">
                 {selectedCount} camera{selectedCount !== 1 ? 's' : ''} selected
               </span>
               <div className="flex gap-2">
@@ -252,24 +252,24 @@ export function MilestoneCameraDiscovery({
           )}
 
           {/* Camera List */}
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <div className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden">
             <div className="max-h-96 overflow-y-auto">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
                 </div>
               ) : filteredCameras.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                  <Camera className="w-12 h-12 mb-3 text-gray-400" />
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-text-muted">
+                  <Camera className="w-12 h-12 mb-3 text-gray-400 dark:text-text-muted" />
                   <p className="text-sm">No cameras found</p>
                   <p className="text-xs mt-1">Click Refresh to discover cameras</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200">
+                <div className="divide-y divide-gray-200 dark:divide-dark-border">
                   {filteredCameras.map((camera) => (
                     <div
                       key={camera.milestoneId}
-                      className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
                     >
                       <input
                         type="checkbox"
@@ -280,7 +280,7 @@ export function MilestoneCameraDiscovery({
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                          <p className="text-sm font-medium text-gray-900 dark:text-text-primary truncate">
                             {camera.name}
                           </p>
                           {camera.status === 'ONLINE' && (
@@ -290,10 +290,10 @@ export function MilestoneCameraDiscovery({
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 dark:text-text-muted">
                           {camera.device.ip} • {camera.device.manufacturer} {camera.device.model}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-gray-400 dark:text-text-muted">
                           {camera.streams.length} stream{camera.streams.length !== 1 ? 's' : ''} •
                           {camera.streams[0]?.resolution}
                         </p>
@@ -318,7 +318,7 @@ export function MilestoneCameraDiscovery({
           </div>
 
           {/* Summary */}
-          <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+          <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-text-secondary">
             <div>
               Showing {filteredCameras.length} of {cameras.length} cameras
             </div>

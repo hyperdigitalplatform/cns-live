@@ -52,12 +52,12 @@ export function StreamGrid({
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-100">
+    <div className="flex flex-col h-full bg-gray-100 dark:bg-dark-base">
       {/* Toolbar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4">
+      <div className="bg-white dark:bg-dark-secondary border-b border-gray-200 dark:border-dark-border px-4 py-3 flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <Grid className="w-5 h-5 text-gray-600" />
-          <span className="font-medium text-gray-700">Layout:</span>
+          <Grid className="w-5 h-5 text-gray-600 dark:text-text-secondary" />
+          <span className="font-medium text-gray-700 dark:text-text-primary">Layout:</span>
         </div>
         <div className="flex gap-2">
           {(Object.keys(GRID_LAYOUTS) as GridLayoutType[]).map((key) => (
@@ -68,14 +68,14 @@ export function StreamGrid({
                 'px-3 py-1 rounded text-sm font-medium transition-colors',
                 layout === key
                   ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 dark:bg-dark-surface text-gray-700 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-dark-elevated'
               )}
             >
               {GRID_LAYOUTS[key].label}
             </button>
           ))}
         </div>
-        <div className="ml-auto text-sm text-gray-600">
+        <div className="ml-auto text-sm text-gray-600 dark:text-text-secondary">
           {visibleCameras.length} of {cameras.length} cameras
         </div>
       </div>
@@ -112,7 +112,7 @@ export function StreamGrid({
             (_, index) => (
               <div
                 key={`empty-${index}`}
-                className="bg-gray-200 rounded-lg flex items-center justify-center text-gray-400"
+                className="bg-gray-200 dark:bg-dark-elevated rounded-lg flex items-center justify-center text-gray-400 dark:text-text-muted"
               >
                 <div className="text-center">
                   <Grid className="w-12 h-12 mx-auto mb-2 opacity-30" />

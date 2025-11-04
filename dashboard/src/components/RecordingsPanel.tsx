@@ -74,21 +74,21 @@ export function RecordingsPanel({ camera, onClose }: RecordingsPanelProps) {
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
+      <div className="bg-white dark:bg-dark-secondary rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col border border-gray-200 dark:border-dark-border">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-border">
           <div className="flex items-center gap-3">
-            <Video className="w-5 h-5 text-blue-500" />
+            <Video className="w-5 h-5 text-blue-500 dark:text-blue-400" />
             <div>
-              <h2 className="text-lg font-semibold text-white">{camera.name} - Recordings</h2>
-              <p className="text-sm text-gray-400">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-text-primary">{camera.name} - Recordings</h2>
+              <p className="text-sm text-gray-500 dark:text-text-secondary">
                 {formatDateTime(timeRange.startTime)} - {formatDateTime(timeRange.endTime)}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-dark-surface rounded-lg transition-colors text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary"
           >
             <X className="w-5 h-5" />
           </button>
@@ -97,25 +97,25 @@ export function RecordingsPanel({ camera, onClose }: RecordingsPanelProps) {
         {/* Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Recordings List */}
-          <div className="w-80 border-r border-gray-700 flex flex-col">
-            <div className="p-4 border-b border-gray-700">
-              <h3 className="text-sm font-medium text-gray-300 mb-2">Time Range</h3>
+          <div className="w-80 border-r border-gray-200 dark:border-dark-border flex flex-col">
+            <div className="p-4 border-b border-gray-200 dark:border-dark-border">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-text-primary mb-2">Time Range</h3>
               <div className="flex flex-col gap-2">
                 <input
                   type="datetime-local"
                   value={timeRange.startTime.slice(0, 16)}
                   onChange={(e) => setTimeRange(prev => ({ ...prev, startTime: new Date(e.target.value).toISOString() }))}
-                  className="bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                  className="bg-white dark:bg-dark-surface text-gray-900 dark:text-text-primary text-sm px-3 py-2 rounded border border-gray-300 dark:border-dark-border focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none"
                 />
                 <input
                   type="datetime-local"
                   value={timeRange.endTime.slice(0, 16)}
                   onChange={(e) => setTimeRange(prev => ({ ...prev, endTime: new Date(e.target.value).toISOString() }))}
-                  className="bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                  className="bg-white dark:bg-dark-surface text-gray-900 dark:text-text-primary text-sm px-3 py-2 rounded border border-gray-300 dark:border-dark-border focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none"
                 />
                 <button
                   onClick={fetchRecordings}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded transition-colors"
+                  className="bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white text-sm px-3 py-2 rounded transition-colors"
                 >
                   Refresh
                 </button>
@@ -145,8 +145,8 @@ export function RecordingsPanel({ camera, onClose }: RecordingsPanelProps) {
                     <button
                       key={index}
                       onClick={() => setSelectedRecording(recording)}
-                      className={`w-full text-left p-3 hover:bg-gray-800 transition-colors ${
-                        selectedRecording === recording ? 'bg-gray-800 border-l-2 border-blue-500' : ''
+                      className={`w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors ${
+                        selectedRecording === recording ? 'bg-gray-100 dark:bg-dark-surface border-l-2 border-blue-500 dark:border-blue-400' : ''
                       }`}
                     >
                       <div className="flex items-start gap-2">

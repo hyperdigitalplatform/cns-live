@@ -121,8 +121,8 @@ export function LayoutManagerDialog({
                   placeholder="Search layouts..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 h-10 rounded-md border border-gray-300 bg-white text-sm
-                    placeholder:text-gray-400
+                  className="w-full pl-10 pr-4 h-10 rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-sm text-gray-900 dark:text-text-primary
+                    placeholder:text-gray-400 dark:placeholder:text-text-muted
                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -136,8 +136,8 @@ export function LayoutManagerDialog({
                 </div>
               ) : filteredLayouts.length === 0 ? (
                 <div className="text-center py-12">
-                  <Settings className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500">
+                  <Settings className="h-12 w-12 text-gray-300 dark:text-text-muted mx-auto mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-text-muted">
                     {searchQuery ? 'No layouts match your search' : 'No saved layouts yet'}
                   </p>
                 </div>
@@ -242,11 +242,11 @@ interface LayoutCardProps {
 
 function LayoutCard({ layout, onEdit, onDelete }: LayoutCardProps) {
   return (
-    <div className="group border border-gray-200 rounded-lg p-4 hover:border-gray-300 hover:shadow-sm transition-all">
+    <div className="group border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:border-gray-300 dark:hover:border-dark-border hover:shadow-sm transition-all">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h4 className="text-sm font-semibold text-gray-900 truncate">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary truncate">
               {layout.name}
             </h4>
             <span
@@ -266,9 +266,9 @@ function LayoutCard({ layout, onEdit, onDelete }: LayoutCardProps) {
             </span>
           </div>
           {layout.description && (
-            <p className="text-sm text-gray-600 mb-2">{layout.description}</p>
+            <p className="text-sm text-gray-600 dark:text-text-secondary mb-2">{layout.description}</p>
           )}
-          <div className="flex items-center gap-4 text-xs text-gray-500">
+          <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-text-muted">
             <span className="flex items-center gap-1">
               <Grid className="h-3 w-3" />
               {layout.camera_count} cameras
@@ -283,14 +283,14 @@ function LayoutCard({ layout, onEdit, onDelete }: LayoutCardProps) {
         <div className="flex items-center gap-1 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onEdit(layout)}
-            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            className="p-2 text-gray-600 dark:text-text-secondary hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
             title="Edit layout"
           >
             <Edit2 className="h-4 w-4" />
           </button>
           <button
             onClick={() => onDelete(layout)}
-            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+            className="p-2 text-gray-600 dark:text-text-secondary hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
             title="Delete layout"
           >
             <Trash2 className="h-4 w-4" />
@@ -369,15 +369,15 @@ function EditLayoutDialog({ layout, onClose, onSuccess }: EditLayoutDialogProps)
               onChange={(e) => setDescription(e.target.value)}
               disabled={saving}
               rows={3}
-              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm
-                placeholder:text-gray-400
+              className="flex w-full rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm text-gray-900 dark:text-text-primary
+                placeholder:text-gray-400 dark:placeholder:text-text-muted
                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md p-3">
               {error}
             </div>
           )}
@@ -433,19 +433,19 @@ function DeleteLayoutDialog({ layout, onClose, onSuccess }: DeleteLayoutDialogPr
         </DialogHeader>
 
         <DialogBody>
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-sm text-gray-700">
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md p-4">
+            <p className="text-sm text-gray-700 dark:text-text-secondary">
               Are you sure you want to delete{' '}
-              <span className="font-semibold text-gray-900">{layout.name}</span>?
+              <span className="font-semibold text-gray-900 dark:text-text-primary">{layout.name}</span>?
             </p>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-sm text-gray-600 dark:text-text-secondary mt-2">
               This layout contains {layout.camera_count} camera
               {layout.camera_count !== 1 ? 's' : ''} and will be permanently removed.
             </p>
           </div>
 
           {error && (
-            <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+            <div className="mt-4 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md p-3">
               {error}
             </div>
           )}

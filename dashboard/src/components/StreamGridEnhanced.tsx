@@ -778,13 +778,13 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-100">
+    <div className="flex flex-col h-full bg-gray-100 dark:bg-dark-base">
       {/* Toolbar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
+      <div className="bg-white dark:bg-dark-sidebar border-b border-gray-200 dark:border-dark-border px-4 py-3">
         <div className="flex items-start gap-4 flex-wrap">
           <div className="flex items-center gap-2 pt-6">
-            <Grid className="w-5 h-5 text-gray-600" />
-            <span className="font-medium text-gray-700">Layout:</span>
+            <Grid className="w-5 h-5 text-gray-600 dark:text-text-secondary" />
+            <span className="font-medium text-gray-700 dark:text-text-primary">Layout:</span>
           </div>
 
           {/* Standard Layouts */}
@@ -800,8 +800,8 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
                       layout === key
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-blue-600 dark:bg-blue-700 text-white shadow-sm'
+                        : 'bg-gray-100 dark:bg-dark-surface text-gray-700 dark:text-text-secondary hover:bg-gray-200 dark:hover:bg-dark-elevated'
                     )}
                   >
                     {GRID_LAYOUTS[key].label}
@@ -812,7 +812,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
 
           {/* Hotspot Layouts */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 font-medium">Hotspot</span>
+            <span className="text-xs text-gray-500 dark:text-text-muted font-medium">Hotspot</span>
             <div className="flex gap-2 flex-wrap">
               {(Object.keys(GRID_LAYOUTS) as GridLayoutType[])
                 .filter((key) => GRID_LAYOUTS[key].isHotspot)
@@ -823,8 +823,8 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border',
                       layout === key
-                        ? 'bg-amber-500 text-white shadow-sm border-amber-600'
-                        : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border-amber-200'
+                        ? 'bg-amber-500 dark:bg-amber-600 text-white shadow-sm border-amber-600 dark:border-amber-700'
+                        : 'bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 border-amber-200 dark:border-amber-700'
                     )}
                   >
                     {GRID_LAYOUTS[key].label}
@@ -834,13 +834,13 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
           </div>
 
           <div className="ml-auto flex items-center gap-3">
-            <div className="text-sm text-gray-600">
-              <span className="font-semibold text-gray-900">{activeCameras}</span> /{' '}
+            <div className="text-sm text-gray-600 dark:text-text-secondary">
+              <span className="font-semibold text-gray-900 dark:text-text-primary">{activeCameras}</span> /{' '}
               {maxCells} cells
             </div>
 
             {/* Layout Management Buttons */}
-            <div className="flex items-center gap-2 border-l border-gray-300 pl-3">
+            <div className="flex items-center gap-2 border-l border-gray-300 dark:border-dark-border pl-3">
               <LoadLayoutDropdown
                 onLayoutSelect={handleLoadLayout}
                 currentLayoutType={getCurrentLayoutType()}
@@ -852,8 +852,8 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                 className={cn(
                   'inline-flex items-center gap-2 px-3 h-10 rounded-md border text-sm font-medium transition-colors',
                   activeCameras > 0
-                    ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
-                    : 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                    ? 'border-blue-600 dark:border-blue-700 bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
+                    : 'border-gray-300 dark:border-dark-border bg-gray-100 dark:bg-dark-surface text-gray-400 dark:text-text-muted cursor-not-allowed'
                 )}
                 title={activeCameras === 0 ? 'Add cameras to save layout' : 'Save current layout'}
               >
@@ -863,7 +863,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
 
               <button
                 onClick={() => setShowManageDialog(true)}
-                className="inline-flex items-center gap-2 px-3 h-10 rounded-md border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center gap-2 px-3 h-10 rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-sidebar text-gray-700 dark:text-text-primary text-sm font-medium hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
                 title="Manage saved layouts"
               >
                 <Settings className="w-4 h-4" />
@@ -874,7 +874,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
             {activeCameras > 0 && (
               <button
                 onClick={handleClearAllClick}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-700 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
                 Clear All
@@ -907,8 +907,8 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                 // Use overflow-visible to allow dropdowns to show, video players handle their own overflow
                 cell.camera ? 'overflow-visible' : 'overflow-hidden',
                 cell.camera
-                  ? 'bg-gray-900 cursor-move'
-                  : 'bg-gray-200 border-2 border-dashed border-gray-300',
+                  ? 'bg-gray-900 dark:bg-dark-elevated cursor-move'
+                  : 'bg-gray-200 dark:bg-dark-surface border-2 border-dashed border-gray-300 dark:border-dark-border',
                 dragOverIndex === index && 'ring-4 ring-blue-500 ring-opacity-50 scale-105',
                 cell.isHotspot && 'ring-2 ring-amber-500'
               )}
@@ -1016,7 +1016,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                 </>
               ) : (
                 /* Empty cell placeholder */
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-4">
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-text-muted p-4">
                   {cell.isHotspot && (
                     <div className="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-md font-semibold shadow-lg">
                       HOTSPOT
@@ -1030,7 +1030,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                     <p className="text-sm font-medium">Drop camera here</p>
                     <p className="text-xs mt-1 opacity-70">or double-click in sidebar</p>
                   </div>
-                  <div className="mt-4 text-xs bg-white/50 px-3 py-1 rounded-full">
+                  <div className="mt-4 text-xs bg-white/50 dark:bg-dark-elevated/50 px-3 py-1 rounded-full">
                     {cell.isHotspot ? 'Hotspot' : `Cell ${index + 1}`}
                   </div>
                 </div>
@@ -1058,12 +1058,12 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
 
           <DialogBody>
             <div className="space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-sm text-red-800">
+              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                <p className="text-sm text-red-800 dark:text-red-300">
                   <strong>Warning:</strong> You are about to clear <strong>{activeCameras} camera{activeCameras !== 1 ? 's' : ''}</strong> from the grid.
                 </p>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-text-secondary">
                 The cameras will remain in your camera list and can be added back to the grid at any time.
               </p>
             </div>

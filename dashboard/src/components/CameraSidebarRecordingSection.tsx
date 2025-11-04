@@ -68,29 +68,29 @@ export function CameraSidebarRecordingSection({
 
   if (!selectedCamera) {
     return (
-      <div className="p-4 text-center text-gray-500">
+      <div className="p-4 text-center text-gray-500 dark:text-text-muted">
         <p className="text-sm">Select a camera to access recording features</p>
       </div>
     );
   }
 
   return (
-    <div className="border-t border-gray-200">
+    <div className="border-t border-gray-200 dark:border-dark-border">
       {/* Recording Control */}
       {selectedCamera.milestone_device_id ? (
-        <div className="p-3 border-b border-gray-200">
+        <div className="p-3 border-b border-gray-200 dark:border-dark-border">
           <RecordingControl
             cameraId={selectedCamera.id}
             onViewRecordings={handleOpenRecordings}
           />
         </div>
       ) : (
-        <div className="p-4 text-center text-gray-500 bg-yellow-50 border-b border-yellow-200">
-          <p className="text-sm font-medium text-yellow-800 mb-1">
+        <div className="p-4 text-center text-gray-500 dark:text-text-muted bg-yellow-50 dark:bg-yellow-900/30 border-b border-yellow-200 dark:border-yellow-700">
+          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-1">
             Milestone Integration Required
           </p>
-          <p className="text-xs text-yellow-700">
-            This camera needs a <code className="bg-yellow-100 px-1 rounded">milestone_device_id</code> to use recording features.
+          <p className="text-xs text-yellow-700 dark:text-yellow-400">
+            This camera needs a <code className="bg-yellow-100 dark:bg-yellow-800 px-1 rounded">milestone_device_id</code> to use recording features.
           </p>
         </div>
       )}
@@ -122,25 +122,25 @@ export function CameraSidebarRecordingSection({
             {/* Date Range Selector */}
             <div className="flex items-center gap-3">
               <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-text-secondary mb-1">
                   Start Time
                 </label>
                 <input
                   type="datetime-local"
                   value={queryStartTime.toISOString().slice(0, 16)}
                   onChange={(e) => setQueryStartTime(new Date(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-lg text-sm bg-white dark:bg-dark-surface text-gray-900 dark:text-text-primary"
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-text-secondary mb-1">
                   End Time
                 </label>
                 <input
                   type="datetime-local"
                   value={queryEndTime.toISOString().slice(0, 16)}
                   onChange={(e) => setQueryEndTime(new Date(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-lg text-sm bg-white dark:bg-dark-surface text-gray-900 dark:text-text-primary"
                 />
               </div>
               <div className="self-end">
@@ -179,30 +179,30 @@ export function CameraSidebarRecordingSection({
 
             {/* Recording Segments List */}
             {timelineData && timelineData.sequences && (
-              <div className="border border-gray-200 rounded-lg">
-                <div className="p-3 bg-gray-50 border-b border-gray-200">
-                  <h4 className="text-sm font-semibold text-gray-900">
+              <div className="border border-gray-200 dark:border-dark-border rounded-lg">
+                <div className="p-3 bg-gray-50 dark:bg-dark-surface border-b border-gray-200 dark:border-dark-border">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-text-primary">
                     Recording Segments ({timelineData.sequences.length})
                   </h4>
                 </div>
-                <div className="max-h-60 overflow-y-auto divide-y divide-gray-200">
+                <div className="max-h-60 overflow-y-auto divide-y divide-gray-200 dark:divide-dark-border">
                   {timelineData.sequences.map((segment: any, index: number) => (
                     <div
                       key={segment.sequenceId}
-                      className="p-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="p-3 hover:bg-gray-50 dark:hover:bg-dark-surface cursor-pointer transition-colors"
                       onClick={() => handleSeek(new Date(segment.startTime))}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-gray-900 dark:text-text-primary">
                             Segment {index + 1}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-gray-500 dark:text-text-muted">
                             {new Date(segment.startTime).toLocaleString()} -{' '}
                             {new Date(segment.endTime).toLocaleString()}
                           </div>
                         </div>
-                        <div className="text-xs text-gray-600">
+                        <div className="text-xs text-gray-600 dark:text-text-secondary">
                           {Math.floor(segment.durationSeconds / 60)} min
                         </div>
                       </div>

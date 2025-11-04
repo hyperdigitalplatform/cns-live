@@ -34,24 +34,24 @@ export function PlaybackView() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-100">
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <h1 className="text-2xl font-bold text-gray-900">Playback</h1>
-        <p className="text-sm text-gray-600 mt-1">
+    <div className="flex flex-col h-full bg-gray-100 dark:bg-dark-base">
+      <div className="bg-white dark:bg-dark-secondary border-b border-gray-200 dark:border-dark-border px-6 py-4">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-text-primary">Playback</h1>
+        <p className="text-sm text-gray-600 dark:text-text-secondary mt-1">
           View recorded footage from cameras
         </p>
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6">
-        <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-2xl">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">
+        <div className="bg-white dark:bg-dark-secondary rounded-lg shadow-lg p-8 w-full max-w-2xl">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-text-primary mb-6">
             Select Playback Parameters
           </h2>
 
           <div className="space-y-6">
             {/* Camera Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-2">
                 Camera
               </label>
               <select
@@ -60,7 +60,7 @@ export function PlaybackView() {
                   const camera = cameras.find((c) => c.id === e.target.value);
                   setSelectedCamera(camera || null);
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-gray-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">Select a camera...</option>
                 {cameras.map((camera) => (
@@ -74,7 +74,7 @@ export function PlaybackView() {
             {/* Time Range */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-2">
                   <Calendar className="inline w-4 h-4 mr-1" />
                   Start Time
                 </label>
@@ -82,12 +82,12 @@ export function PlaybackView() {
                   type="datetime-local"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-gray-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-2">
                   <Clock className="inline w-4 h-4 mr-1" />
                   End Time
                 </label>
@@ -95,14 +95,14 @@ export function PlaybackView() {
                   type="datetime-local"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-dark-border rounded-lg bg-white dark:bg-dark-surface text-gray-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
             </div>
 
             {/* Quick Time Ranges */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-text-secondary mb-2">
                 Quick Select
               </label>
               <div className="flex gap-2">
@@ -120,7 +120,7 @@ export function PlaybackView() {
                         format(subHours(now, hours), "yyyy-MM-dd'T'HH:mm")
                       );
                     }}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                    className="px-4 py-2 bg-gray-100 dark:bg-dark-surface hover:bg-gray-200 dark:hover:bg-dark-elevated text-gray-700 dark:text-text-secondary rounded-lg text-sm font-medium transition-colors"
                   >
                     {label}
                   </button>
@@ -132,7 +132,7 @@ export function PlaybackView() {
             <button
               onClick={handlePlayback}
               disabled={!selectedCamera}
-              className="w-full px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-medium rounded-lg transition-colors"
+              className="w-full px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-dark-surface text-white dark:disabled:text-text-muted font-medium rounded-lg transition-colors"
             >
               Start Playback
             </button>

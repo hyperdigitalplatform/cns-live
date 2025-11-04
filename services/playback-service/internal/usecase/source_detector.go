@@ -28,14 +28,7 @@ type MilestoneClient interface {
 	GetRecordingMetadata(ctx context.Context, cameraID string, startTime, endTime time.Time) (*MilestoneRecordingMetadata, error)
 }
 
-// MilestoneRecordingMetadata contains Milestone recording info
-type MilestoneRecordingMetadata struct {
-	Available    bool
-	SegmentCount int
-	TotalSize    int64
-	StartTime    time.Time
-	EndTime      time.Time
-}
+// Note: MilestoneRecordingMetadata is defined in milestone_playback_usecase.go
 
 func NewSourceDetector(
 	storageClient StorageClient,

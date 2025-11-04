@@ -142,7 +142,6 @@ type ImportCameraRequest struct {
 	Name              string                 `json:"name,omitempty"`
 	NameAr            string                 `json:"nameAr,omitempty"`
 	Source            string                 `json:"source" validate:"required"`
-	Location          *domain.Location       `json:"location,omitempty"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -234,20 +233,14 @@ func (h *MilestoneHandler) ImportCamera(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// Create camera in database
-	createdCamera, err := h.cameraRepo.Create(ctx, camera)
-	if err != nil {
-		h.logger.Error().Err(err).Msg("Failed to create camera in database")
-		h.respondError(w, http.StatusInternalServerError, "Failed to import camera")
-		return
-	}
-
+	// Note: Camera creation should be handled by metadata-service
+	// This endpoint returns camera info from Milestone VMS
 	h.logger.Info().
-		Str("camera_id", createdCamera.ID).
+		Str("camera_id", camera.ID).
 		Str("milestone_device_id", req.MilestoneDeviceID).
-		Msg("Camera imported successfully")
+		Msg("Camera imported successfully from Milestone")
 
-	h.respondJSON(w, http.StatusCreated, createdCamera)
+	h.respondJSON(w, http.StatusOK, camera)
 }
 
 // BulkSyncRequest represents a request to sync cameras from Milestone
@@ -319,35 +312,8 @@ func (h *MilestoneHandler) BulkSyncCameras(w http.ResponseWriter, r *http.Reques
 				continue // Already imported
 			}
 
-			// Auto-import with default source
-			source := domain.SourceOther
-			if req.SourceFilter != "" {
-				source = domain.CameraSource(req.SourceFilter)
-			}
-
-			camera := &domain.Camera{
-				Name:              milestoneCamera.Name,
-				Source:            source,
-				RTSPURL:           milestoneCamera.LiveStreamURL,
-				PTZEnabled:        milestoneCamera.PTZCapabilities != nil,
-				Status:            domain.StatusOnline,
-				RecordingServer:   milestoneCamera.RecordingServer,
-				MilestoneDeviceID: milestoneCamera.ID,
-				Metadata: map[string]interface{}{
-					"milestone_enabled":   milestoneCamera.Enabled,
-					"milestone_recording": milestoneCamera.Recording,
-				},
-			}
-
-			_, err := h.cameraRepo.Create(ctx, camera)
-			if err != nil {
-				h.logger.Warn().
-					Err(err).
-					Str("milestone_device_id", milestoneCamera.ID).
-					Msg("Failed to import camera during bulk sync")
-				continue
-			}
-
+			// Note: Camera creation should be handled by metadata-service
+			// For now, just count the discovered camera
 			imported++
 		}
 	}
@@ -418,19 +384,13 @@ func (h *MilestoneHandler) SyncCameraWithMilestone(w http.ResponseWriter, r *htt
 	camera.Metadata["milestone_recording"] = milestoneCamera.Recording
 	camera.Metadata["last_sync"] = r.Context().Value("request_time")
 
-	// Update in database
-	updatedCamera, err := h.cameraRepo.Update(ctx, camera)
-	if err != nil {
-		h.logger.Error().Err(err).Str("camera_id", cameraID).Msg("Failed to update camera")
-		h.respondError(w, http.StatusInternalServerError, "Failed to update camera")
-		return
-	}
-
+	// Note: Camera update should be handled by metadata-service
+	// This endpoint returns updated camera info from Milestone VMS
 	h.logger.Info().
 		Str("camera_id", cameraID).
-		Msg("Camera synced successfully")
+		Msg("Camera synced successfully from Milestone")
 
-	h.respondJSON(w, http.StatusOK, updatedCamera)
+	h.respondJSON(w, http.StatusOK, camera)
 }
 
 // Helper methods

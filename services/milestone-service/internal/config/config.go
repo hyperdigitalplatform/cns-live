@@ -31,7 +31,7 @@ func Load() (*Config, error) {
 			Port: getEnvInt("PORT", 8080),
 		},
 		Milestone: MilestoneConfig{
-			BaseURL:  getEnv("MILESTONE_BASE_URL", "https://192.168.1.11"),
+			BaseURL:  getEnv("MILESTONE_BASE_URL", "https://192.168.1.9"),
 			Username: getEnv("MILESTONE_USERNAME", ""),
 			Password: getEnv("MILESTONE_PASSWORD", ""),
 		},

@@ -96,83 +96,19 @@ func (u *MilestonePlaybackUsecase) QueryRecordings(ctx context.Context, req Quer
 		}
 	}
 
-	// Query Milestone for sequences
-	sequenceReq := client.SequenceQueryRequest{
+	// TODO: Implement QuerySequences method in milestone client
+	// For now, return empty timeline
+	u.logger.Warn().
+		Str("camera_id", req.CameraID).
+		Msg("QuerySequences not yet implemented, returning empty timeline")
+
+	timelineData := domain.TimelineData{
 		CameraID:  req.CameraID,
 		StartTime: req.StartTime,
 		EndTime:   req.EndTime,
+		Sequences: []domain.Sequence{},
 	}
-
-	sequenceList, err := u.milestoneClient.QuerySequences(ctx, sequenceReq)
-	if err != nil {
-		u.logger.Error().
-			Err(err).
-			Str("camera_id", req.CameraID).
-			Msg("Failed to query sequences from Milestone")
-		return nil, fmt.Errorf("failed to query sequences: %w", err)
-	}
-
-	// Convert to timeline data
-	sequences := make([]RecordingSequence, len(sequenceList.Sequences))
-	totalRecordingSeconds := 0
-
-	for i, seq := range sequenceList.Sequences {
-		sequences[i] = RecordingSequence{
-			SequenceID:      seq.SequenceID,
-			StartTime:       seq.StartTime,
-			EndTime:         seq.EndTime,
-			DurationSeconds: seq.DurationSeconds,
-			Available:       seq.Available,
-			SizeBytes:       seq.SizeBytes,
-		}
-		totalRecordingSeconds += seq.DurationSeconds
-	}
-
-	gaps := make([]RecordingGap, len(sequenceList.Gaps))
-	totalGapSeconds := 0
-
-	for i, gap := range sequenceList.Gaps {
-		gaps[i] = RecordingGap{
-			StartTime:       gap.StartTime,
-			EndTime:         gap.EndTime,
-			DurationSeconds: gap.DurationSeconds,
-		}
-		totalGapSeconds += gap.DurationSeconds
-	}
-
-	// Calculate coverage
-	totalDuration := int(req.EndTime.Sub(req.StartTime).Seconds())
-	coverage := 0.0
-	if totalDuration > 0 {
-		coverage = float64(totalRecordingSeconds) / float64(totalDuration)
-	}
-
-	timelineData := &TimelineData{
-		CameraID: req.CameraID,
-		QueryRange: TimeRange{
-			Start: req.StartTime,
-			End:   req.EndTime,
-		},
-		Sequences:             sequences,
-		Gaps:                  gaps,
-		TotalRecordingSeconds: totalRecordingSeconds,
-		TotalGapSeconds:       totalGapSeconds,
-		Coverage:              coverage,
-	}
-
-	// Cache the result
-	if cachedData, err := json.Marshal(timelineData); err == nil {
-		u.cache.Set(cacheKey, cachedData, 5*time.Minute) // Cache for 5 minutes
-	}
-
-	u.logger.Info().
-		Str("camera_id", req.CameraID).
-		Int("sequences", len(sequences)).
-		Int("gaps", len(gaps)).
-		Float64("coverage", coverage).
-		Msg("Recording query completed")
-
-	return timelineData, nil
+	return &timelineData, nil
 }
 
 // GetTimelineData retrieves timeline data with aggregation for UI
@@ -283,46 +219,13 @@ func (u *MilestonePlaybackUsecase) StartPlayback(ctx context.Context, req Playba
 		req.Format = "hls"
 	}
 
-	// Get video stream from Milestone
-	streamReq := client.VideoStreamRequest{
-		CameraID:  req.CameraID,
-		Timestamp: req.Timestamp,
-		Speed:     req.Speed,
-		Format:    req.Format,
-	}
-
-	stream, err := u.milestoneClient.GetVideoStream(ctx, streamReq)
-	if err != nil {
-		u.logger.Error().
-			Err(err).
-			Str("camera_id", req.CameraID).
-			Msg("Failed to get video stream from Milestone")
-		return nil, fmt.Errorf("failed to get video stream: %w", err)
-	}
-	defer stream.Close()
-
-	// TODO: Implement FFmpeg transmuxing to HLS
-	// For now, return a placeholder stream URL
-
-	sessionID := fmt.Sprintf("playback_%s_%d", req.CameraID, time.Now().Unix())
-	streamURL := fmt.Sprintf("/playback/stream/%s.m3u8", sessionID)
-
-	session := &PlaybackSession{
-		SessionID:   sessionID,
-		CameraID:    req.CameraID,
-		StartTime:   req.Timestamp,
-		CurrentTime: req.Timestamp,
-		Speed:       req.Speed,
-		Format:      req.Format,
-		StreamURL:   streamURL,
-	}
-
-	u.logger.Info().
-		Str("session_id", sessionID).
+	// TODO: Implement GetVideoStream method in milestone client
+	u.logger.Warn().
 		Str("camera_id", req.CameraID).
-		Msg("Playback session started")
+		Msg("GetVideoStream not yet implemented")
 
-	return session, nil
+	// Return error for now
+	return nil, fmt.Errorf("video streaming not yet implemented")
 }
 
 // GetSnapshot retrieves a snapshot at a specific timestamp
@@ -332,21 +235,13 @@ func (u *MilestonePlaybackUsecase) GetSnapshot(ctx context.Context, cameraID str
 		Time("timestamp", timestamp).
 		Msg("Getting snapshot")
 
-	snapshot, err := u.milestoneClient.GetSnapshot(ctx, cameraID, timestamp)
-	if err != nil {
-		u.logger.Error().
-			Err(err).
-			Str("camera_id", cameraID).
-			Msg("Failed to get snapshot from Milestone")
-		return nil, fmt.Errorf("failed to get snapshot: %w", err)
-	}
-
-	u.logger.Info().
+	// TODO: Implement GetSnapshot method in milestone client
+	u.logger.Warn().
 		Str("camera_id", cameraID).
-		Int("size_bytes", len(snapshot)).
-		Msg("Snapshot retrieved")
+		Msg("GetSnapshot not yet implemented")
 
-	return snapshot, nil
+	// Return error for now
+	return nil, fmt.Errorf("snapshot retrieval not yet implemented")
 }
 
 // generateCacheKey generates a cache key for query results

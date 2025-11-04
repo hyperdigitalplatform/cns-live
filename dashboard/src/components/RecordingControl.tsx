@@ -140,7 +140,8 @@ export function RecordingControl({
           <Button
             onClick={handleStopRecording}
             disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2"
+            variant="danger"
+            className="w-full flex items-center justify-center gap-2"
           >
             <Square className="w-4 h-4" />
             {loading ? 'Stopping...' : 'Stop Recording'}
@@ -151,13 +152,13 @@ export function RecordingControl({
         <div className="space-y-3">
           {/* Duration Selector */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-medium text-gray-700 dark:text-text-primary mb-1.5">
               Duration
             </label>
             <select
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface text-gray-900 dark:text-text-primary rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
             >
               {DURATION_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -171,7 +172,8 @@ export function RecordingControl({
           <Button
             onClick={handleStartRecording}
             disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2"
+            variant="danger"
+            className="w-full flex items-center justify-center gap-2"
           >
             <Circle className="w-4 h-4" />
             {loading ? 'Starting...' : 'Start Recording'}

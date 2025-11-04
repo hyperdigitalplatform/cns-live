@@ -13,10 +13,10 @@ export interface ToastProps {
 }
 
 const toastStyles = {
-  success: 'bg-green-50 border-green-200 text-green-800',
-  error: 'bg-red-50 border-red-200 text-red-800',
-  warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
+  success: 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700 text-green-800 dark:text-green-300',
+  error: 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 text-red-800 dark:text-red-300',
+  warning: 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300',
+  info: 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700 text-blue-800 dark:text-blue-300',
 };
 
 const toastIcons = {
@@ -27,10 +27,10 @@ const toastIcons = {
 };
 
 const iconColors = {
-  success: 'text-green-600',
-  error: 'text-red-600',
-  warning: 'text-yellow-600',
-  info: 'text-blue-600',
+  success: 'text-green-600 dark:text-green-400',
+  error: 'text-red-600 dark:text-red-400',
+  warning: 'text-yellow-600 dark:text-yellow-400',
+  info: 'text-blue-600 dark:text-blue-400',
 };
 
 export function Toast({ message, type = 'info', duration = 5000, onClose, show }: ToastProps) {
@@ -80,7 +80,7 @@ export function Toast({ message, type = 'info', duration = 5000, onClose, show }
         <button
           onClick={handleClose}
           className={cn(
-            'flex-shrink-0 p-1 rounded hover:bg-black/10 transition-colors',
+            'flex-shrink-0 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors',
             iconColors[type]
           )}
           aria-label="Close"

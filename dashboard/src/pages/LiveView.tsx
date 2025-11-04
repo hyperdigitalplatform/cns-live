@@ -19,7 +19,7 @@ export function LiveView() {
       {/* Main Content */}
       <div className="flex-1">
         {selectedCameras.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full bg-gray-100 text-gray-500">
+          <div className="flex flex-col items-center justify-center h-full bg-gray-100 dark:bg-dark-base text-gray-500 dark:text-text-secondary">
             <p className="text-lg">Select cameras from the sidebar to view</p>
           </div>
         ) : (

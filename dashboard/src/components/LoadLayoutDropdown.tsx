@@ -81,12 +81,12 @@ export function LoadLayoutDropdown({
         onClick={() => setOpen(!open)}
         className={cn(
           'inline-flex items-center justify-center gap-2',
-          'px-4 h-10 rounded-md border border-gray-300 bg-white',
-          'text-sm font-medium text-gray-700',
-          'hover:bg-gray-50 hover:border-gray-400',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+          'px-4 h-10 rounded-md border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-surface',
+          'text-sm font-medium text-gray-700 dark:text-text-secondary',
+          'hover:bg-gray-50 dark:hover:bg-dark-elevated hover:border-gray-400 dark:hover:border-dark-border',
+          'focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-offset-2',
           'transition-colors',
-          open && 'bg-gray-50 border-gray-400'
+          open && 'bg-gray-50 dark:bg-dark-elevated border-gray-400 dark:border-dark-border'
         )}
       >
         <FolderOpen className="h-4 w-4" />
@@ -100,12 +100,12 @@ export function LoadLayoutDropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="p-3 border-b border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-900">
+        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-dark-sidebar rounded-lg shadow-lg border border-gray-200 dark:border-dark-border z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="p-3 border-b border-gray-200 dark:border-dark-border">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-text-primary">
               Saved Layouts
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500 dark:text-text-muted mt-0.5">
               Select a layout to apply
             </p>
           </div>
@@ -130,9 +130,9 @@ export function LoadLayoutDropdown({
               </div>
             ) : layouts.length === 0 ? (
               <div className="p-8 text-center">
-                <FolderOpen className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-500">No saved layouts yet</p>
-                <p className="text-xs text-gray-400 mt-1">
+                <FolderOpen className="h-12 w-12 text-gray-300 dark:text-text-muted mx-auto mb-3" />
+                <p className="text-sm text-gray-500 dark:text-text-muted">No saved layouts yet</p>
+                <p className="text-xs text-gray-400 dark:text-text-muted mt-1">
                   Save your first layout to get started
                 </p>
               </div>
@@ -193,7 +193,7 @@ function LayoutItem({ layout, onSelect, isCurrentType }: LayoutItemProps) {
     <button
       onClick={() => onSelect(layout)}
       className={cn(
-        'w-full px-3 py-2.5 text-left hover:bg-gray-50 transition-colors',
+        'w-full px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors',
         'flex items-start gap-3 group'
       )}
     >
@@ -201,8 +201,8 @@ function LayoutItem({ layout, onSelect, isCurrentType }: LayoutItemProps) {
         className={cn(
           'mt-0.5 p-1.5 rounded',
           layout.scope === 'global'
-            ? 'bg-blue-100 text-blue-600'
-            : 'bg-gray-100 text-gray-600'
+            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+            : 'bg-gray-100 dark:bg-dark-surface text-gray-600 dark:text-text-secondary'
         )}
       >
         {layout.scope === 'global' ? (
@@ -214,21 +214,21 @@ function LayoutItem({ layout, onSelect, isCurrentType }: LayoutItemProps) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+          <p className="text-sm font-medium text-gray-900 dark:text-text-primary truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
             {layout.name}
           </p>
           {isCurrentType && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400">
               Current Type
             </span>
           )}
         </div>
         {layout.description && (
-          <p className="text-xs text-gray-500 mt-0.5 truncate">
+          <p className="text-xs text-gray-500 dark:text-text-muted mt-0.5 truncate">
             {layout.description}
           </p>
         )}
-        <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+        <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400 dark:text-text-muted">
           <span className="flex items-center gap-1">
             <Grid className="h-3 w-3" />
             {layout.camera_count} cameras

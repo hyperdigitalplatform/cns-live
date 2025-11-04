@@ -70,27 +70,27 @@ export function CameraSidebar({
   ];
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200">
+    <div className="flex flex-col h-full bg-white dark:bg-dark-sidebar border-r border-gray-200 dark:border-dark-border">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Cameras</h2>
+      <div className="p-4 border-b border-gray-200 dark:border-dark-border">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-text-primary mb-3">Cameras</h2>
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-text-muted" />
           <input
             type="text"
             placeholder="Search cameras..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-lg text-sm bg-white dark:bg-dark-secondary text-gray-900 dark:text-text-primary placeholder:text-gray-400 dark:placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
 
         {/* Filters Toggle */}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="mt-2 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          className="mt-2 flex items-center gap-2 text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-text-primary transition-colors"
         >
           <Filter className="w-4 h-4" />
           <span>Filters</span>
@@ -106,7 +106,7 @@ export function CameraSidebar({
         {showFilters && (
           <div className="mt-3 space-y-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-text-secondary mb-1">
                 Source
               </label>
               <select
@@ -114,7 +114,7 @@ export function CameraSidebar({
                 onChange={(e) =>
                   setSourceFilter(e.target.value as CameraSource | 'ALL')
                 }
-                className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-1.5 border border-gray-300 dark:border-dark-border rounded text-sm bg-white dark:bg-dark-secondary text-gray-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 {sources.map((source) => (
                   <option key={source} value={source}>
@@ -125,7 +125,7 @@ export function CameraSidebar({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-text-secondary mb-1">
                 Status
               </label>
               <select
@@ -133,7 +133,7 @@ export function CameraSidebar({
                 onChange={(e) =>
                   setStatusFilter(e.target.value as CameraStatus | 'ALL')
                 }
-                className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-1.5 border border-gray-300 dark:border-dark-border rounded text-sm bg-white dark:bg-dark-secondary text-gray-900 dark:text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 {statuses.map((status) => (
                   <option key={status} value={status}>
@@ -149,11 +149,11 @@ export function CameraSidebar({
       {/* Camera List */}
       <div className="flex-1 overflow-y-auto p-2">
         {loading ? (
-          <div className="flex items-center justify-center py-8 text-gray-500">
+          <div className="flex items-center justify-center py-8 text-gray-500 dark:text-text-secondary">
             <Circle className="w-5 h-5 animate-spin" />
           </div>
         ) : filteredCameras.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 text-sm">
+          <div className="text-center py-8 text-gray-500 dark:text-text-secondary text-sm">
             No cameras found
           </div>
         ) : (
@@ -171,22 +171,22 @@ export function CameraSidebar({
                   className={cn(
                     'w-full p-3 rounded-lg text-left transition-colors',
                     isSelected
-                      ? 'bg-primary-50 border-2 border-primary-500'
-                      : 'bg-white border-2 border-transparent hover:bg-gray-50'
+                      ? 'bg-primary-50 dark:bg-primary-500/10 border-2 border-primary-500'
+                      : 'bg-white dark:bg-dark-secondary border-2 border-transparent hover:bg-gray-50 dark:hover:bg-dark-surface'
                   )}
                 >
                   <div className="flex items-start gap-2">
                     {isOnline ? (
-                      <Video className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <Video className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
                     ) : (
-                      <VideoOff className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                      <VideoOff className="w-5 h-5 text-gray-400 dark:text-text-muted flex-shrink-0 mt-0.5" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-gray-900 truncate">
+                      <p className="font-medium text-sm text-gray-900 dark:text-text-primary truncate">
                         {camera.name}
                       </p>
                       {camera.name_ar && (
-                        <p className="text-xs text-gray-500 truncate">
+                        <p className="text-xs text-gray-500 dark:text-text-muted truncate">
                           {camera.name_ar}
                         </p>
                       )}
@@ -195,19 +195,19 @@ export function CameraSidebar({
                           className={cn(
                             'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
                             isOnline
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-gray-100 text-gray-700'
+                              ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'
+                              : 'bg-gray-100 dark:bg-gray-500/20 text-gray-700 dark:text-text-secondary'
                           )}
                         >
                           <span
                             className={cn(
                               'w-1.5 h-1.5 rounded-full',
-                              isOnline ? 'bg-green-500' : 'bg-gray-400'
+                              isOnline ? 'bg-green-500 dark:bg-green-400' : 'bg-gray-400 dark:bg-text-muted'
                             )}
                           />
                           {camera.status}
                         </span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 dark:text-text-muted">
                           {camera.source.replace('_', ' ')}
                         </span>
                       </div>
@@ -221,8 +221,8 @@ export function CameraSidebar({
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <p className="text-sm text-gray-600">
+      <div className="p-4 border-t border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-secondary">
+        <p className="text-sm text-gray-600 dark:text-text-secondary">
           <span className="font-medium">{selectedCameras.length}</span> of{' '}
           <span className="font-medium">{filteredCameras.length}</span> selected
         </p>
