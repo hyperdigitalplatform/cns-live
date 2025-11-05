@@ -823,8 +823,8 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border',
                       layout === key
-                        ? 'bg-amber-500 dark:bg-amber-600 text-white shadow-sm border-amber-600 dark:border-amber-700'
-                        : 'bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 border-amber-200 dark:border-amber-700'
+                        ? 'bg-purple-500 dark:bg-purple-600 text-white shadow-sm border-purple-600 dark:border-purple-500'
+                        : 'bg-purple-50 dark:bg-purple-800/50 text-purple-700 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-700/50 border-purple-200 dark:border-purple-600'
                     )}
                   >
                     {GRID_LAYOUTS[key].label}
@@ -910,7 +910,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                   ? 'bg-gray-900 dark:bg-dark-elevated cursor-move'
                   : 'bg-gray-200 dark:bg-dark-surface border-2 border-dashed border-gray-300 dark:border-dark-border',
                 dragOverIndex === index && 'ring-4 ring-blue-500 ring-opacity-50 scale-105',
-                cell.isHotspot && 'ring-2 ring-amber-500'
+                cell.isHotspot && 'ring-2 ring-purple-500 dark:ring-purple-400'
               )}
             >
               {cell.camera ? (
@@ -1009,7 +1009,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
 
                   {/* Hotspot indicator */}
                   {cell.isHotspot && (
-                    <div className="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-md font-semibold shadow-lg">
+                    <div className="absolute top-2 left-2 bg-purple-600 dark:bg-purple-500 text-white text-xs px-2 py-1 rounded-md font-semibold shadow-lg">
                       HOTSPOT
                     </div>
                   )}
@@ -1018,7 +1018,7 @@ export const StreamGridEnhanced = forwardRef<StreamGridEnhancedRef, StreamGridEn
                 /* Empty cell placeholder */
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-text-muted p-4">
                   {cell.isHotspot && (
-                    <div className="absolute top-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-md font-semibold shadow-lg">
+                    <div className="absolute top-2 left-2 bg-purple-600 dark:bg-purple-500 text-white text-xs px-2 py-1 rounded-md font-semibold shadow-lg">
                       HOTSPOT
                     </div>
                   )}

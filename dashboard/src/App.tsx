@@ -4,6 +4,8 @@ import { LiveView } from '@/pages/LiveView';
 import { LiveViewEnhanced } from '@/pages/LiveViewEnhanced';
 import { PlaybackView } from '@/pages/PlaybackView';
 import CameraDiscovery from '@/pages/CameraDiscovery';
+import { SingleCameraView } from '@/pages/SingleCameraView';
+import { GridView } from '@/pages/GridView';
 import { Toaster } from 'react-hot-toast';
 import { Video, History, Activity, Settings, Camera } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -38,17 +40,27 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const location = useLocation();
+
+  // Check if current route is an embed page
+  const isEmbedPage = location.pathname.startsWith('/camera/') || location.pathname.startsWith('/grid-view');
+
   return (
-    <BrowserRouter>
-      <AppLayout>
-        <Routes>
-          <Route path="/" element={<LiveViewEnhanced />} />
-          <Route path="/legacy" element={<LiveView />} />
-          <Route path="/playback" element={<PlaybackView />} />
-          <Route path="/discovery" element={<CameraDiscovery />} />
-          <Route
-            path="/analytics"
-            element={
+    <>
+      <Routes>
+        {/* Embed Pages - No AppLayout wrapper */}
+        <Route path="/camera/:cameraId" element={<SingleCameraView />} />
+        <Route path="/grid-view" element={<GridView />} />
+
+        {/* Main Application Pages - With AppLayout */}
+        <Route path="/" element={<AppLayout><LiveViewEnhanced /></AppLayout>} />
+        <Route path="/legacy" element={<AppLayout><LiveView /></AppLayout>} />
+        <Route path="/playback" element={<AppLayout><PlaybackView /></AppLayout>} />
+        <Route path="/discovery" element={<AppLayout><CameraDiscovery /></AppLayout>} />
+        <Route
+          path="/analytics"
+          element={
+            <AppLayout>
               <div className="flex items-center justify-center h-full text-gray-500 dark:text-text-secondary">
                 <div className="text-center">
                   <Activity className="w-16 h-16 mx-auto mb-4 opacity-30" />
@@ -58,11 +70,13 @@ function App() {
                   </p>
                 </div>
               </div>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
+            </AppLayout>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <AppLayout>
               <div className="flex items-center justify-center h-full text-gray-500 dark:text-text-secondary">
                 <div className="text-center">
                   <Settings className="w-16 h-16 mx-auto mb-4 opacity-30" />
@@ -70,13 +84,21 @@ function App() {
                   <p className="text-sm mt-2">Configuration - Coming Soon</p>
                 </div>
               </div>
-            }
-          />
-        </Routes>
-      </AppLayout>
+            </AppLayout>
+          }
+        />
+      </Routes>
       <Toaster position="top-right" />
+    </>
+  );
+}
+
+function AppWrapper() {
+  return (
+    <BrowserRouter>
+      <App />
     </BrowserRouter>
   );
 }
 
-export default App;
+export default AppWrapper;
