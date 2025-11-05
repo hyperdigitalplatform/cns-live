@@ -1,0 +1,384 @@
+package manager
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+)
+
+// MilestoneRecordingManager manages manual recordings via Milestone XProtect
+type MilestoneRecordingManager struct {
+	// TODO: Add milestone client when implemented
+	// milestoneClient  *client.MilestoneClient
+	activeRecordings map[string]*ActiveRecording
+	mu               sync.RWMutex
+	logger           zerolog.Logger
+}
+
+// ActiveRecording represents an active recording session
+type ActiveRecording struct {
+	RecordingID     string
+	CameraID        string
+	StartTime       time.Time
+	DurationSeconds int
+	TriggeredBy     string
+	StopTimer       *time.Timer
+	Status          string // recording, stopping, stopped, failed
+}
+
+// StartRecordingRequest represents a request to start manual recording
+type StartRecordingRequest struct {
+	CameraID        string
+	DurationSeconds int
+	TriggeredBy     string
+	Description     string
+}
+
+// RecordingSession represents the response for a recording session
+type RecordingSession struct {
+	RecordingID       string    `json:"recordingId"`
+	CameraID          string    `json:"cameraId"`
+	StartTime         time.Time `json:"startTime"`
+	EstimatedEndTime  time.Time `json:"estimatedEndTime"`
+	DurationSeconds   int       `json:"durationSeconds"`
+	Status            string    `json:"status"`
+}
+
+// RecordingStatus represents current recording status
+type RecordingStatus struct {
+	IsRecording      bool             `json:"isRecording"`
+	CurrentRecording *RecordingSession `json:"currentRecording,omitempty"`
+	LastRecording    *RecordingSession `json:"lastRecording,omitempty"`
+}
+
+// NewMilestoneRecordingManager creates a new recording manager
+func NewMilestoneRecordingManager(milestoneClient *client.MilestoneClient, logger zerolog.Logger) *MilestoneRecordingManager {
+	return &MilestoneRecordingManager{
+		milestoneClient:  milestoneClient,
+		activeRecordings: make(map[string]*ActiveRecording),
+		logger:           logger,
+	}
+}
+
+// StartRecording initiates a manual recording session
+func (m *MilestoneRecordingManager) StartRecording(ctx context.Context, req StartRecordingRequest) (*RecordingSession, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check if camera is already recording
+	if existing, exists := m.activeRecordings[req.CameraID]; exists {
+		if existing.Status == "recording" {
+			return nil, fmt.Errorf("camera %s is already recording (session: %s)", req.CameraID, existing.RecordingID)
+		}
+	}
+
+	// Set default duration if not specified
+	if req.DurationSeconds == 0 {
+		req.DurationSeconds = 900 // 15 minutes default
+	}
+
+	// Validate duration limits (max 2 hours)
+	if req.DurationSeconds > 7200 {
+		return nil, fmt.Errorf("duration exceeds maximum limit of 2 hours")
+	}
+
+	m.logger.Info().
+		Str("camera_id", req.CameraID).
+		Int("duration_seconds", req.DurationSeconds).
+		Str("triggered_by", req.TriggeredBy).
+		Msg("Starting manual recording")
+
+	// Call Milestone API to start recording
+	milestoneReq := client.StartRecordingRequest{
+		CameraID:        req.CameraID,
+		DurationSeconds: req.DurationSeconds,
+		TriggerBy:       req.TriggeredBy,
+		Description:     req.Description,
+	}
+
+	session, err := m.milestoneClient.StartRecording(ctx, milestoneReq)
+	if err != nil {
+		m.logger.Error().
+			Err(err).
+			Str("camera_id", req.CameraID).
+			Msg("Failed to start recording on Milestone")
+		return nil, fmt.Errorf("failed to start Milestone recording: %w", err)
+	}
+
+	// Create active recording entry
+	activeRec := &ActiveRecording{
+		RecordingID:     session.RecordingID,
+		CameraID:        req.CameraID,
+		StartTime:       session.StartTime,
+		DurationSeconds: req.DurationSeconds,
+		TriggeredBy:     req.TriggeredBy,
+		Status:          "recording",
+	}
+
+	// Schedule auto-stop
+	activeRec.StopTimer = time.AfterFunc(time.Duration(req.DurationSeconds)*time.Second, func() {
+		m.logger.Info().
+			Str("camera_id", req.CameraID).
+			Str("recording_id", session.RecordingID).
+			Msg("Auto-stopping recording after duration elapsed")
+
+		if err := m.StopRecording(context.Background(), req.CameraID); err != nil {
+			m.logger.Error().
+				Err(err).
+				Str("camera_id", req.CameraID).
+				Msg("Failed to auto-stop recording")
+		}
+	})
+
+	m.activeRecordings[req.CameraID] = activeRec
+
+	m.logger.Info().
+		Str("camera_id", req.CameraID).
+		Str("recording_id", session.RecordingID).
+		Time("estimated_end_time", session.EstimatedEndTime).
+		Msg("Recording started successfully")
+
+	return &RecordingSession{
+		RecordingID:      session.RecordingID,
+		CameraID:         req.CameraID,
+		StartTime:        session.StartTime,
+		EstimatedEndTime: session.EstimatedEndTime,
+		DurationSeconds:  req.DurationSeconds,
+		Status:           "recording",
+	}, nil
+}
+
+// StopRecording stops an active recording session
+func (m *MilestoneRecordingManager) StopRecording(ctx context.Context, cameraID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	activeRec, exists := m.activeRecordings[cameraID]
+	if !exists {
+		return fmt.Errorf("no active recording found for camera %s", cameraID)
+	}
+
+	if activeRec.Status != "recording" {
+		return fmt.Errorf("recording is not in active state: %s", activeRec.Status)
+	}
+
+	m.logger.Info().
+		Str("camera_id", cameraID).
+		Str("recording_id", activeRec.RecordingID).
+		Msg("Stopping manual recording")
+
+	// Cancel the auto-stop timer
+	if activeRec.StopTimer != nil {
+		activeRec.StopTimer.Stop()
+	}
+
+	// Call Milestone API to stop recording
+	err := m.milestoneClient.StopRecording(ctx, cameraID, activeRec.RecordingID)
+	if err != nil {
+		m.logger.Error().
+			Err(err).
+			Str("camera_id", cameraID).
+			Str("recording_id", activeRec.RecordingID).
+			Msg("Failed to stop recording on Milestone")
+
+		activeRec.Status = "failed"
+		return fmt.Errorf("failed to stop Milestone recording: %w", err)
+	}
+
+	activeRec.Status = "stopped"
+
+	// Remove from active recordings after a short delay (keep for status queries)
+	go func() {
+		time.Sleep(5 * time.Minute)
+		m.mu.Lock()
+		delete(m.activeRecordings, cameraID)
+		m.mu.Unlock()
+	}()
+
+	m.logger.Info().
+		Str("camera_id", cameraID).
+		Str("recording_id", activeRec.RecordingID).
+		Msg("Recording stopped successfully")
+
+	return nil
+}
+
+// GetStatus retrieves current recording status for a camera
+func (m *MilestoneRecordingManager) GetStatus(ctx context.Context, cameraID string) (*RecordingStatus, error) {
+	m.mu.RLock()
+	activeRec, exists := m.activeRecordings[cameraID]
+	m.mu.RUnlock()
+
+	// If we have an active recording in our local state
+	if exists && activeRec.Status == "recording" {
+		elapsed := time.Since(activeRec.StartTime).Seconds()
+		remaining := float64(activeRec.DurationSeconds) - elapsed
+
+		return &RecordingStatus{
+			IsRecording: true,
+			CurrentRecording: &RecordingSession{
+				RecordingID:      activeRec.RecordingID,
+				CameraID:         cameraID,
+				StartTime:        activeRec.StartTime,
+				EstimatedEndTime: activeRec.StartTime.Add(time.Duration(activeRec.DurationSeconds) * time.Second),
+				DurationSeconds:  activeRec.DurationSeconds,
+				Status:           activeRec.Status,
+			},
+		}, nil
+	}
+
+	// Query Milestone for current status
+	milestoneStatus, err := m.milestoneClient.GetRecordingStatus(ctx, cameraID)
+	if err != nil {
+		m.logger.Error().
+			Err(err).
+			Str("camera_id", cameraID).
+			Msg("Failed to get recording status from Milestone")
+		return nil, fmt.Errorf("failed to get Milestone recording status: %w", err)
+	}
+
+	status := &RecordingStatus{
+		IsRecording: milestoneStatus.IsRecording,
+	}
+
+	if milestoneStatus.CurrentRecording != nil {
+		status.CurrentRecording = &RecordingSession{
+			RecordingID:      milestoneStatus.CurrentRecording.RecordingID,
+			CameraID:         milestoneStatus.CurrentRecording.CameraID,
+			StartTime:        milestoneStatus.CurrentRecording.StartTime,
+			EstimatedEndTime: milestoneStatus.CurrentRecording.EstimatedEndTime,
+			DurationSeconds:  milestoneStatus.CurrentRecording.DurationSeconds,
+			Status:           milestoneStatus.CurrentRecording.Status,
+		}
+	}
+
+	if milestoneStatus.LastRecording != nil {
+		status.LastRecording = &RecordingSession{
+			RecordingID:      milestoneStatus.LastRecording.RecordingID,
+			CameraID:         milestoneStatus.LastRecording.CameraID,
+			StartTime:        milestoneStatus.LastRecording.StartTime,
+			EstimatedEndTime: milestoneStatus.LastRecording.EstimatedEndTime,
+			DurationSeconds:  milestoneStatus.LastRecording.DurationSeconds,
+			Status:           milestoneStatus.LastRecording.Status,
+		}
+	}
+
+	return status, nil
+}
+
+// RestoreActiveSessions restores active recording sessions after service restart
+func (m *MilestoneRecordingManager) RestoreActiveSessions(ctx context.Context, cameraIDs []string) error {
+	m.logger.Info().
+		Int("camera_count", len(cameraIDs)).
+		Msg("Restoring active recording sessions")
+
+	for _, cameraID := range cameraIDs {
+		status, err := m.milestoneClient.GetRecordingStatus(ctx, cameraID)
+		if err != nil {
+			m.logger.Warn().
+				Err(err).
+				Str("camera_id", cameraID).
+				Msg("Failed to query recording status during restoration")
+			continue
+		}
+
+		if status.IsRecording && status.CurrentRecording != nil {
+			rec := status.CurrentRecording
+
+			elapsed := time.Since(rec.StartTime).Seconds()
+			remaining := float64(rec.DurationSeconds) - elapsed
+
+			if remaining > 0 {
+				activeRec := &ActiveRecording{
+					RecordingID:     rec.RecordingID,
+					CameraID:        cameraID,
+					StartTime:       rec.StartTime,
+					DurationSeconds: rec.DurationSeconds,
+					Status:          "recording",
+				}
+
+				// Re-schedule auto-stop for remaining time
+				activeRec.StopTimer = time.AfterFunc(time.Duration(remaining)*time.Second, func() {
+					m.logger.Info().
+						Str("camera_id", cameraID).
+						Str("recording_id", rec.RecordingID).
+						Msg("Auto-stopping restored recording after remaining duration")
+
+					if err := m.StopRecording(context.Background(), cameraID); err != nil {
+						m.logger.Error().
+							Err(err).
+							Str("camera_id", cameraID).
+							Msg("Failed to auto-stop restored recording")
+					}
+				})
+
+				m.mu.Lock()
+				m.activeRecordings[cameraID] = activeRec
+				m.mu.Unlock()
+
+				m.logger.Info().
+					Str("camera_id", cameraID).
+					Str("recording_id", rec.RecordingID).
+					Float64("remaining_seconds", remaining).
+					Msg("Restored active recording session")
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetActiveRecordings returns list of all active recordings
+func (m *MilestoneRecordingManager) GetActiveRecordings() map[string]*ActiveRecording {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Return a copy to avoid concurrent access issues
+	active := make(map[string]*ActiveRecording)
+	for k, v := range m.activeRecordings {
+		active[k] = v
+	}
+
+	return active
+}
+
+// Shutdown gracefully stops all active recordings
+func (m *MilestoneRecordingManager) Shutdown(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.logger.Info().
+		Int("active_count", len(m.activeRecordings)).
+		Msg("Shutting down recording manager, stopping all active recordings")
+
+	for cameraID, activeRec := range m.activeRecordings {
+		if activeRec.Status == "recording" {
+			m.logger.Info().
+				Str("camera_id", cameraID).
+				Str("recording_id", activeRec.RecordingID).
+				Msg("Stopping recording for shutdown")
+
+			// Cancel timer
+			if activeRec.StopTimer != nil {
+				activeRec.StopTimer.Stop()
+			}
+
+			// Stop recording on Milestone
+			if err := m.milestoneClient.StopRecording(ctx, cameraID, activeRec.RecordingID); err != nil {
+				m.logger.Error().
+					Err(err).
+					Str("camera_id", cameraID).
+					Msg("Failed to stop recording during shutdown")
+			}
+		}
+	}
+
+	m.activeRecordings = make(map[string]*ActiveRecording)
+
+	m.logger.Info().Msg("Recording manager shutdown complete")
+	return nil
+}

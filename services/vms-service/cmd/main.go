@@ -10,6 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog"
@@ -17,7 +20,7 @@ import (
 
 	httpdelivery "github.com/rta/cctv/vms-service/internal/delivery/http"
 	"github.com/rta/cctv/vms-service/internal/repository/cache"
-	"github.com/rta/cctv/vms-service/internal/repository/postgres"
+	postgresrepo "github.com/rta/cctv/vms-service/internal/repository/postgres"
 )
 
 func main() {
@@ -56,7 +59,7 @@ func main() {
 	logger.Info().Msg("Connected to PostgreSQL database")
 
 	// Initialize PostgreSQL repository
-	cameraRepo := postgres.NewPostgresRepository(db, logger)
+	cameraRepo := postgresrepo.NewPostgresRepository(db, logger)
 
 	// Initialize cache
 	cacheTTL := 5 * time.Minute
@@ -148,35 +151,45 @@ func initDatabase(ctx context.Context, logger zerolog.Logger) (*sql.DB, error) {
 	return db, nil
 }
 
-// runMigrations executes database migrations
+// runMigrations executes database migrations using golang-migrate
 func runMigrations(ctx context.Context, db *sql.DB, logger zerolog.Logger) error {
 	logger.Info().Msg("Running database migrations")
 
-	// List of migration files in order
-	migrationFiles := []string{
-		"migrations/001_create_cameras_table.sql",
-		"migrations/002_create_layout_preferences.sql",
+	// Create postgres driver instance
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return fmt.Errorf("failed to create migration driver: %w", err)
 	}
 
-	for _, file := range migrationFiles {
-		// Read migration file
-		migrationSQL, err := os.ReadFile(file)
-		if err != nil {
-			logger.Warn().Err(err).Str("file", file).Msg("Migration file not found, skipping")
-			continue
-		}
-
-		// Execute migration
-		if _, err := db.ExecContext(ctx, string(migrationSQL)); err != nil {
-			logger.Error().Err(err).Str("file", file).Msg("Migration failed")
-			// Don't fail on migration errors (tables might already exist)
-			continue
-		}
-
-		logger.Info().Str("file", file).Msg("Migration executed successfully")
+	// Create migration instance
+	// Use file:// prefix for local filesystem migrations
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://migrations",
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create migration instance: %w", err)
 	}
 
-	logger.Info().Msg("Database migrations completed")
+	// Run all pending migrations
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	// Get current migration version
+	version, dirty, err := m.Version()
+	if err != nil && err != migrate.ErrNilVersion {
+		logger.Warn().Err(err).Msg("Failed to get migration version")
+	} else if err == migrate.ErrNilVersion {
+		logger.Info().Msg("No migrations applied yet")
+	} else {
+		logger.Info().
+			Uint("version", version).
+			Bool("dirty", dirty).
+			Msg("Database migrations completed")
+	}
+
 	return nil
 }
 

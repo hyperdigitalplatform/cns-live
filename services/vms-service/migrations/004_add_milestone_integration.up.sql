@@ -16,7 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_cameras_last_milestone_sync ON cameras(last_miles
 -- Create milestone_recording_sessions table
 CREATE TABLE IF NOT EXISTS milestone_recording_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    camera_id UUID NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
+    camera_id VARCHAR(255) NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
     milestone_recording_id VARCHAR(255) NOT NULL,
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP,
@@ -63,7 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_sync_history_status ON milestone_sync_history(sta
 -- Create milestone_playback_cache table
 CREATE TABLE IF NOT EXISTS milestone_playback_cache (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    camera_id UUID NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
+    camera_id VARCHAR(255) NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
     query_hash VARCHAR(64) NOT NULL,
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP NOT NULL,
