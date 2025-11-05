@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rta/cctv/recording-service/internal/client"
 	"github.com/rs/zerolog"
 )
@@ -215,9 +214,6 @@ func (m *MilestoneRecordingManager) GetStatus(ctx context.Context, cameraID stri
 
 	// If we have an active recording in our local state
 	if exists && activeRec.Status == "recording" {
-		elapsed := time.Since(activeRec.StartTime).Seconds()
-		remaining := float64(activeRec.DurationSeconds) - elapsed
-
 		return &RecordingStatus{
 			IsRecording: true,
 			CurrentRecording: &RecordingSession{

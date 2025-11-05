@@ -352,7 +352,6 @@ type ControlPlaybackRequest struct {
 // ControlPlayback controls an active playback session
 // POST /playback/cameras/{cameraId}/control
 func (h *MilestonePlaybackHandler) ControlPlayback(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	cameraID := chi.URLParam(r, "cameraId")
 
 	if cameraID == "" {

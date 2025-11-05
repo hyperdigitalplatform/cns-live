@@ -93,9 +93,13 @@ func main() {
 		logger,
 	)
 
+	// Initialize memory cache for milestone playback queries
+	queryCache := cache.NewMemoryCache()
+
 	// Initialize milestone playback use case
 	milestonePlaybackUseCase := usecase.NewMilestonePlaybackUsecase(
 		milestoneClient,
+		queryCache,
 		logger,
 	)
 

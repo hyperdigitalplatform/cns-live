@@ -25,10 +25,8 @@ type StorageClient interface {
 // MilestoneClient interface for Milestone VMS operations
 type MilestoneClient interface {
 	CheckRecordingAvailability(ctx context.Context, cameraID string, startTime, endTime time.Time) (bool, error)
-	GetRecordingMetadata(ctx context.Context, cameraID string, startTime, endTime time.Time) (*MilestoneRecordingMetadata, error)
+	GetRecordingMetadata(ctx context.Context, cameraID string, startTime, endTime time.Time) (*domain.MilestoneRecordingMetadata, error)
 }
-
-// Note: MilestoneRecordingMetadata is defined in milestone_playback_usecase.go
 
 func NewSourceDetector(
 	storageClient StorageClient,

@@ -7,7 +7,8 @@ rtc:
   tcp_port: 7881
   port_range_start: 40000
   port_range_end: 40100
-  use_external_ip: true
+  use_external_ip: false  # Changed to false for local development
+  node_ip: 127.0.0.1      # Force localhost for browser connection
   stun_servers:
     - stun.l.google.com:19302
 

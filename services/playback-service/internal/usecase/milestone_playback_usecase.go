@@ -102,11 +102,17 @@ func (u *MilestonePlaybackUsecase) QueryRecordings(ctx context.Context, req Quer
 		Str("camera_id", req.CameraID).
 		Msg("QuerySequences not yet implemented, returning empty timeline")
 
-	timelineData := domain.TimelineData{
-		CameraID:  req.CameraID,
-		StartTime: req.StartTime,
-		EndTime:   req.EndTime,
-		Sequences: []domain.Sequence{},
+	timelineData := TimelineData{
+		CameraID: req.CameraID,
+		QueryRange: TimeRange{
+			Start: req.StartTime,
+			End:   req.EndTime,
+		},
+		Sequences:             []RecordingSequence{},
+		Gaps:                  []RecordingGap{},
+		TotalRecordingSeconds: 0,
+		TotalGapSeconds:       0,
+		Coverage:              0.0,
 	}
 	return &timelineData, nil
 }
@@ -255,11 +261,3 @@ func (u *MilestonePlaybackUsecase) generateCacheKey(req QueryRequest) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// MilestoneRecordingMetadata represents metadata from Milestone
-type MilestoneRecordingMetadata struct {
-	Available    bool      `json:"available"`
-	SegmentCount int       `json:"segmentCount"`
-	TotalSize    int64     `json:"totalSize"`
-	StartTime    time.Time `json:"startTime"`
-	EndTime      time.Time `json:"endTime"`
-}
